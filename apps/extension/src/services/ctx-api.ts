@@ -13,7 +13,13 @@ export async function pingCtx(): Promise<boolean> {
 
 export async function getCtxAppUrl(): Promise<string> {
   const { apiUrl } = await getSettings();
-  return apiUrl;
+  return apiUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+}
+
+export async function getCtxPageUrl(path = ""): Promise<string> {
+  const appUrl = await getCtxAppUrl();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${appUrl}${normalizedPath === "/" ? "" : normalizedPath}`;
 }
 
 export async function fetchCapsules(): Promise<Capsule[]> {

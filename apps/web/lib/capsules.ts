@@ -27,7 +27,7 @@ export function toPortableCapsule(capsule: any): PortableCapsule {
     source: {
       type: capsule.sourceType ?? "manual",
       platform: capsule.platform ?? undefined,
-      url: capsule.sourceUrl ?? undefined,
+      url: normalizeSourceUrl(capsule.sourceUrl) ?? undefined,
       capturedAt: capsule.createdAt.toISOString()
     },
     project: capsule.project
@@ -61,7 +61,8 @@ function buildData(input: CreateCapsuleInput | UpdateCapsuleInput) {
   const rawText = redactSecrets(input.rawText ?? "");
   const markdown = redactSecrets(input.markdown ?? "");
   const summary = redactSecrets(input.summary ?? "");
-  const platform = input.platform || detectPlatformFromUrl(input.sourceUrl);
+  const sourceUrl = normalizeSourceUrl(input.sourceUrl);
+  const platform = input.platform || detectPlatformFromUrl(sourceUrl);
 
   return {
     title: input.title ?? "Untitled Capsule",
@@ -70,7 +71,7 @@ function buildData(input: CreateCapsuleInput | UpdateCapsuleInput) {
     rawText: rawText || null,
     markdown: markdown || null,
     platform,
-    sourceUrl: input.sourceUrl || null,
+    sourceUrl,
     sourceType: input.sourceType || "manual",
     goals: serializeList(input.goals),
     decisions: serializeList(input.decisions),
@@ -81,6 +82,18 @@ function buildData(input: CreateCapsuleInput | UpdateCapsuleInput) {
     importance: input.importance ?? 0,
     tokenEstimate: estimateTokens([summary, rawText, markdown, linesToArray(input.goals).join(" ")].join("\n"))
   };
+}
+
+export function normalizeSourceUrl(url: string | null | undefined) {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  try {
+    const parsed = new URL(trimmed);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveProject(input: CreateCapsuleInput | UpdateCapsuleInput) {

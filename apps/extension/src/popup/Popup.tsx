@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Capsule } from "../types";
-import { fetchCapsules } from "../services/ctx-api";
+import { fetchCapsules, getCtxPageUrl } from "../services/ctx-api";
 import { getSettings, saveSettings } from "../services/storage";
 
 export function Popup() {
@@ -25,6 +25,10 @@ export function Popup() {
     await saveSettings({ apiUrl: value });
   }
 
+  async function openCtx(path = "") {
+    await chrome.tabs.create({ url: await getCtxPageUrl(path) });
+  }
+
   return (
     <main>
       <header>
@@ -34,8 +38,8 @@ export function Popup() {
       <section className="actions" aria-label="Actions">
         <button type="button" onClick={() => send("ctx:capture-selection")}>Capture Selection</button>
         <button type="button" onClick={() => send("ctx:capture-page")}>Capture Page</button>
-        <button type="button" onClick={() => chrome.tabs.create({ url: "http://localhost:3000" })}>Open Dashboard</button>
-        <button type="button" onClick={() => chrome.tabs.create({ url: "http://localhost:3000/search" })}>Search Capsules</button>
+        <button type="button" onClick={() => openCtx()}>Open Dashboard</button>
+        <button type="button" onClick={() => openCtx("/search")}>Search Capsules</button>
       </section>
       <label htmlFor="api-url">CTX API URL</label>
       <input id="api-url" name="apiUrl" value={apiUrl} onChange={(event) => saveApiUrl(event.target.value)} spellCheck={false} />

@@ -5,7 +5,8 @@
   "version": "0.1.0",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
-    "http://localhost:3000/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://claude.ai/*",

@@ -30,7 +30,7 @@ export function buildQuickCapsuleInput(input: QuickCapsuleInput): CreateCapsuleI
   const rawText = cleanText(input.text ?? input.rawText ?? input.markdown ?? "");
   if (!rawText.trim()) throw new Error("Paste, select, or capture some text before generating a capsule.");
 
-  const sourceUrl = input.url ?? input.sourceUrl ?? "";
+  const sourceUrl = normalizeSourceUrl(input.url ?? input.sourceUrl);
   const platform = input.platform || detectPlatformFromUrl(sourceUrl);
   const title = inferTitle(input.title, rawText, sourceUrl);
   const summary = summarize(rawText);
@@ -69,6 +69,18 @@ function cleanText(text: string) {
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, 60000);
+}
+
+function normalizeSourceUrl(url: string | null | undefined) {
+  const trimmed = url?.trim();
+  if (!trimmed) return "";
+  if (!/^https?:\/\//i.test(trimmed)) return "";
+  try {
+    const parsed = new URL(trimmed);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 function inferTitle(title: string | undefined, text: string, sourceUrl: string) {
