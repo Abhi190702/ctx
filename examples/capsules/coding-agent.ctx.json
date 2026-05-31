@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_coding_agent",
+  "title": "Coding Agent Debugging Capsule",
+  "source": {
+    "type": "agent_session",
+    "platform": "cursor",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "Research OS"
+  },
+  "summary": "Debugging memory for a TypeScript agent that failed on path aliases and Prisma client generation.",
+  "goals": ["Fix build", "Document setup"],
+  "decisions": ["Run prisma generate before Next build"],
+  "constraints": ["Keep scripts cross-platform"],
+  "openQuestions": ["Should packages export source or dist?"],
+  "nextSteps": ["Add CI typecheck"],
+  "tags": ["typescript", "debugging", "agent"],
+  "content": {
+    "rawText": "The agent hit missing Prisma client and unresolved workspace package aliases.",
+    "markdown": ""
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 45,
+    "importance": 4
+  }
+}

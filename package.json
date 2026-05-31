@@ -1,0 +1,32 @@
+{
+  "name": "ctx",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable memory for AI workflows.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm db:push && pnpm --filter @ctx/web dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write .",
+    "db:push": "pnpm --filter @ctx/web db:push",
+    "db:seed": "pnpm --filter @ctx/web db:seed",
+    "db:reset": "pnpm --filter @ctx/web db:reset",
+    "web:dev": "pnpm db:push && pnpm --filter @ctx/web dev",
+    "mcp:dev": "pnpm --filter @ctx/mcp-server dev",
+    "extension:dev": "pnpm --filter @ctx/extension dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.28.0",
+    "@types/node": "^22.15.29",
+    "eslint": "^9.28.0",
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.33.1"
+  }
+}

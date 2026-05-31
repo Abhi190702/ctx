@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "0.1.0",
+  "exportedAt": "2026-05-31T10:00:00.000Z",
+  "capsules": [
+    {
+      "schemaVersion": "0.1.0",
+      "title": "Sample Export Capsule",
+      "summary": "A tiny export example.",
+      "goals": [],
+      "decisions": [],
+      "constraints": [],
+      "openQuestions": [],
+      "nextSteps": [],
+      "tags": ["sample"],
+      "content": {
+        "rawText": "Sample raw context.",
+        "markdown": ""
+      },
+      "metadata": {
+        "version": 1,
+        "tokenEstimate": 8,
+        "importance": 1
+      }
+    }
+  ]
+}

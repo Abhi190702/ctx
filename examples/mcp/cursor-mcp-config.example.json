@@ -1,0 +1,9 @@
+{
+  "ctx": {
+    "command": "pnpm",
+    "args": ["--filter", "@ctx/mcp-server", "dev"],
+    "env": {
+      "CTX_API_URL": "http://localhost:3000/api"
+    }
+  }
+}

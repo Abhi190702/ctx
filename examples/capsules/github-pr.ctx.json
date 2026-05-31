@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_github_pr",
+  "title": "GitHub PR #42: Add MCP project memory tool",
+  "source": {
+    "type": "github_pull_request",
+    "platform": "github",
+    "url": "https://github.com/example/ctx/pull/42",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "example/ctx",
+    "repository": "https://github.com/example/ctx"
+  },
+  "summary": "Preserves PR context for an MCP tool that returns combined project memory.",
+  "goals": ["Understand PR changes", "Review implementation", "Track merge context"],
+  "decisions": ["Base branch: main", "Head branch: mcp-project-memory"],
+  "constraints": ["Repository: example/ctx", "PR state: open"],
+  "openQuestions": ["Should project lookup allow name and id?"],
+  "nextSteps": ["Run tests", "Address comments"],
+  "tags": ["github", "pull-request", "pr", "example", "ctx"],
+  "content": {
+    "rawText": "PR adds ctx_get_project_memory to MCP server.",
+    "markdown": "Review API error behavior when project is missing."
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 68,
+    "importance": 6
+  }
+}

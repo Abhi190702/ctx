@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+build
+coverage
+.turbo
+.pnpm-store
+.env
+.env.local
+dev.db
+dev.db-journal
+*.log
+*.tsbuildinfo
+apps/web/.next
+apps/extension/dist
+apps/mcp-server/dist

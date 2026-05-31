@@ -1,0 +1,10 @@
+{
+  "extends": "./packages/config/typescript/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ctx/core": ["packages/core/src/index.ts"],
+      "@ctx/ui": ["packages/ui/src/index.ts"]
+    }
+  }
+}

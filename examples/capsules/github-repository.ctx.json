@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_github_repository",
+  "title": "GitHub Repository: example/ctx",
+  "source": {
+    "type": "github_repository",
+    "platform": "github",
+    "url": "https://github.com/example/ctx",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "example/ctx",
+    "repository": "https://github.com/example/ctx"
+  },
+  "summary": "Repository metadata captured from GitHub. Language: TypeScript.",
+  "goals": ["Understand repository purpose", "Capture project metadata", "Preserve useful repo overview"],
+  "decisions": [],
+  "constraints": ["Default branch: main", "License: MIT"],
+  "openQuestions": [],
+  "nextSteps": [],
+  "tags": ["github", "repository", "example", "ctx", "typescript"],
+  "content": {
+    "rawText": "Name: ctx\nDescription: Portable memory for AI workflows.\nLanguage: TypeScript\nStars: 128",
+    "markdown": "Name: ctx\nDescription: Portable memory for AI workflows."
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 42,
+    "importance": 5
+  }
+}

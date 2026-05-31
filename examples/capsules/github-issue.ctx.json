@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_github_issue",
+  "title": "GitHub Issue #17: Add capsule diff view",
+  "source": {
+    "type": "github_issue",
+    "platform": "github",
+    "url": "https://github.com/example/ctx/issues/17",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "example/ctx",
+    "repository": "https://github.com/example/ctx"
+  },
+  "summary": "Track a request to compare capsule versions and show meaningful context changes.",
+  "goals": ["Understand issue request", "Track required implementation", "Preserve discussion context"],
+  "decisions": ["Label: enhancement"],
+  "constraints": ["Repository: example/ctx", "Issue state: open"],
+  "openQuestions": ["Should diffs render markdown and raw context separately?"],
+  "nextSteps": ["Review issue", "Identify files to change", "Open PR"],
+  "tags": ["github", "issue", "example", "ctx", "enhancement"],
+  "content": {
+    "rawText": "Issue asks for version diffing between CTX capsule snapshots.",
+    "markdown": "Add a visual diff for capsule versions."
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 64,
+    "importance": 6
+  }
+}

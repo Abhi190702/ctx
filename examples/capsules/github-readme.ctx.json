@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_github_readme",
+  "title": "GitHub README: example/ctx",
+  "source": {
+    "type": "github_readme",
+    "platform": "github",
+    "url": "https://github.com/example/ctx#readme",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "example/ctx",
+    "repository": "https://github.com/example/ctx"
+  },
+  "summary": "Repository README captured from GitHub.",
+  "goals": ["Understand repository purpose", "Capture setup instructions", "Preserve project documentation"],
+  "decisions": [],
+  "constraints": [],
+  "openQuestions": [],
+  "nextSteps": [],
+  "tags": ["github", "readme", "example", "ctx"],
+  "content": {
+    "rawText": "# CTX\nPortable memory for AI workflows.",
+    "markdown": "# CTX\nPortable memory for AI workflows."
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 32,
+    "importance": 4
+  }
+}

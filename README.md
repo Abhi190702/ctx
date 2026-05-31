@@ -2,317 +2,145 @@
 
 **Portable memory for AI workflows.**
 
-CTX is an open-source, local-first context layer that helps you capture, organize, and reuse important project context across ChatGPT, Claude, Gemini, Cursor, Windsurf, and MCP-compatible AI tools.
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6)
+![Next.js](https://img.shields.io/badge/Next.js-App%20Router-black)
+![MCP](https://img.shields.io/badge/MCP-ready-8bf5cf)
+![Local-first](https://img.shields.io/badge/local--first-SQLite-ffd166)
+![License](https://img.shields.io/badge/license-MIT-white)
 
-When your AI chat becomes too long, your tokens run out, or you want to switch from one AI platform to another, CTX lets you package the important context into a reusable capsule and inject it wherever you need it.
+CTX is an open-source, local-first context platform for capturing, organizing, searching, versioning, monitoring, and injecting reusable AI context across ChatGPT, Claude, Gemini, Cursor, Windsurf, GitHub, and MCP-compatible tools.
 
----
+CTX turns messy AI conversations into structured reusable project memory.
 
-## Why CTX?
+## Why CTX Exists
 
-AI tools are powerful, but they do not share memory.
+AI platforms do not share memory. You might start in ChatGPT, continue in Claude, debug in Cursor, research in Gemini, and lose context every time you switch tools. CTX converts conversations, GitHub issues, PRs, README files, docs, and notes into portable `.ctx.json` capsules that can be reused anywhere.
 
-You may start a project in ChatGPT, continue it in Claude, debug it in Cursor, and research it in Gemini. Every time you switch tools, you lose context.
+## Demo Workflow
 
-CTX solves this by creating portable context capsules.
-
-A CTX capsule can contain:
-
-- Project summaries
-- Goals
-- Decisions
-- Constraints
-- Open questions
-- Next steps
-- Raw conversation context
-- Source links
-- Tags
-- Attachments in future versions
-
----
-
-## Core Idea
-
-CTX turns messy AI conversations into structured, reusable project memory.
-
-Instead of copy-pasting long conversations again and again, you can save a capsule once and reuse it anywhere.
-
-Example:
-
-```txt
-User works in ChatGPT
-↓
-CTX captures project context
-↓
-CTX creates a structured capsule
-↓
-User opens Claude, Gemini, Cursor, or another AI tool
-↓
-User clicks CTX button
-↓
-The capsule is injected into the new AI chat
+```text
+ChatGPT / Claude / Gemini / Cursor / GitHub
+-> CTX Capture
+-> Capsule
+-> Search / Version / Monitor
+-> CTX Button
+-> Inject into any AI chat
+-> Continue work with full context
 ```
 
 ## Features
 
-### Current MVP Goals
-- Create and edit context capsules
-- Organize capsules by project and tags
-- Search saved capsules
-- Export and import capsules as JSON
-- Browser extension for capturing selected text
-- Browser extension button for injecting capsules into AI chats
-- MCP server for AI agents and tools
-- Local-first SQLite database
+- Web dashboard for capsules, projects, search, monitoring, GitHub capture, MCP setup, and settings.
+- Browser extension foundation with CTX prompt button and floating capsule picker.
+- MCP server with tools for search, create, update, export, GitHub capture, and project memory.
+- Prisma + SQLite local-first storage.
+- Zod-validated capsule format and GitHub capture inputs.
+- Secret redaction for common API keys, tokens, passwords, and private keys.
+- Activity logs for creation, updates, deletion, export, injection, and GitHub capture.
+- Empty-by-default local workspace so your first capsules are yours.
 
-### Planned Features
-- ChatGPT, Claude, Gemini, and Perplexity conversation capture
-- GitHub issue and PR capture
-- Gmail and documentation capture
-- Capsule version history
-- Capsule merge
-- Capsule diff
-- Team workspaces
-- Local encryption
-- Secret redaction
-- Semantic search
-- Desktop app
-- VS Code extension
-
-## What is a Capsule?
-
-A capsule is a structured context package.
-
-```json
-{
-  "schemaVersion": "0.1.0",
-  "title": "Kubernetes Auto-Healing Dashboard",
-  "summary": "The user is building an open-source dashboard for Kubernetes monitoring.",
-  "goals": [
-    "Show cluster health",
-    "Detect pod failures",
-    "Suggest remediation"
-  ],
-  "decisions": [
-    "Use React for frontend",
-    "Use Prometheus for metrics"
-  ],
-  "constraints": [
-    "Local-first",
-    "Open-source",
-    "Beginner-friendly setup"
-  ],
-  "nextSteps": [
-    "Create dashboard UI",
-    "Add mock Prometheus data",
-    "Build MCP server"
-  ],
-  "tags": ["kubernetes", "devops", "aiops"]
-}
-```
-
-## Monorepo Structure
+## Architecture
 
 ```text
-ctx/
-├── apps/
-│   ├── web/          # Next.js dashboard
-│   ├── extension/    # Browser extension
-│   └── mcp-server/   # MCP server
-├── packages/
-│   ├── core/         # Capsule schema, formatting, validation
-│   ├── database/     # Database access layer
-│   ├── ui/           # Shared UI components
-│   └── config/       # Shared configs
-├── docs/             # Documentation
-├── examples/         # Example capsules and configs
-├── scripts/          # Setup and utility scripts
-└── docker/           # Docker setup
+apps/web          Next.js dashboard, API routes, Prisma schema
+apps/extension    Manifest V3 CTX capture and injection extension
+apps/mcp-server   Node.js TypeScript MCP server
+packages/core     Capsule schemas, formatters, redaction, GitHub mapping
+packages/database Repository helpers around Prisma
+packages/ui       Small shared UI primitives
+docs              Product and integration documentation
+examples          Portable .ctx.json examples and MCP configs
 ```
-
-## Tech Stack
-- Next.js
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Prisma
-- SQLite
-- Node.js
-- MCP SDK
-- Chrome Extension APIs
-- pnpm
-- Turborepo
 
 ## Getting Started
 
-### Prerequisites
-
-Install:
-
-- Node.js 20+
-- pnpm
-- Git
-
-### Clone the repository
-```bash
-git clone https://github.com/your-username/ctx.git
-cd ctx
-```
-
-### Install dependencies
 ```bash
 pnpm install
-```
-
-### Set up environment variables
-```bash
-cp .env.example .env
-```
-
-### Set up database
-```bash
-pnpm db:push
-pnpm db:seed
-```
-
-### Run development server
-```bash
 pnpm dev
 ```
 
-The web app should run at:
-http://localhost:3000
+The root `dev` script pushes the SQLite schema and starts the web app with an empty workspace.
 
-### Environment Variables
+Open [http://localhost:3000](http://localhost:3000).
+
+## Environment Variables
+
+Copy `.env.example` to `.env` or use the safe local defaults already included for development.
+
 ```env
 DATABASE_URL="file:./dev.db"
 CTX_APP_URL="http://localhost:3000"
 CTX_API_URL="http://localhost:3000/api"
+GITHUB_TOKEN=""
 ```
 
+Set `GITHUB_TOKEN` to enable real GitHub issue, pull request, README, and repository capture.
+
 ## Scripts
-- `pnpm dev`             # Run all apps in development
-- `pnpm build`           # Build all apps
-- `pnpm lint`            # Run linting
-- `pnpm test`            # Run tests
-- `pnpm format`          # Format code
-- `pnpm db:push`         # Push Prisma schema
-- `pnpm db:seed`         # Seed local database
-- `pnpm db:reset`        # Reset local database
+
+- `pnpm dev` - prepare DB and run the web app.
+- `pnpm build` - build all packages/apps with Turborepo.
+- `pnpm test` - run Vitest where tests exist.
+- `pnpm typecheck` - run TypeScript checks.
+- `pnpm db:push` - push Prisma schema to SQLite.
+- `pnpm db:seed` - confirms the workspace is empty by default.
+- `pnpm web:dev` - run the web app.
+- `pnpm extension:dev` - build the extension in watch mode.
+- `pnpm mcp:dev` - run the MCP server.
+
+## Capsule Format
+
+CTX capsules are portable `.ctx.json` documents with:
+
+- source metadata
+- project metadata
+- summary
+- goals, decisions, constraints, open questions, next steps
+- tags
+- raw and markdown content
+- token estimate and version metadata
+
+See [docs/capsule-format.md](docs/capsule-format.md).
 
 ## Browser Extension
 
-The CTX extension lets users:
+The extension injects a small `CTX` button near AI prompt boxes. Click it, search saved capsules, and insert a clean AI-ready memory prompt into the current input. It uses conservative selectors and exits silently if it cannot find a prompt.
 
-- Capture selected text
-- Capture the current page
-- Save content as a capsule
-- Inject saved capsules into AI chat boxes
-
-Supported platforms planned:
-
-- ChatGPT
-- Claude
-- Gemini
-- Perplexity
-- Cursor web flows
-- Generic websites
+See [docs/browser-extension.md](docs/browser-extension.md).
 
 ## MCP Server
 
-CTX includes an MCP server so AI clients can access your capsules.
+The MCP server exposes CTX memory to Claude Desktop, Cursor, Windsurf, and compatible clients.
 
-Planned MCP tools:
+See [docs/mcp-server.md](docs/mcp-server.md).
 
-- `ctx_search_capsules`
-- `ctx_get_capsule`
-- `ctx_create_capsule`
-- `ctx_update_capsule`
-- `ctx_list_recent_capsules`
-- `ctx_export_capsule`
+## GitHub Integration
 
-Example use:
+CTX can convert GitHub issues, pull requests, README files, and repository metadata into structured capsules through the official GitHub REST API.
 
-*Search my CTX capsules for the Kubernetes dashboard project and load the latest context.*
+See [docs/github-integration.md](docs/github-integration.md).
 
-## Privacy
+## Monitoring Dashboard
 
-CTX is designed to be local-first.
+The `/monitor` page shows total capsules, projects, injections, platform distribution, recent activity, recent captures, recent injections, and capsule health signals such as missing summaries, missing tags, stale capsules, and high token capsules.
 
-Your context can stay on your machine.
+## Local-First Privacy
 
-Privacy-focused goals:
-
-- Local SQLite database by default
-- No forced cloud account
-- No hidden tracking
-- Exportable data
-- Secret redaction planned
-- Local encryption planned
+CTX defaults to SQLite on your machine. Captures stay local unless you explicitly connect external services. Redaction runs before capture storage for common secret patterns.
 
 ## Roadmap
 
-### Phase 0
-- [ ] Project setup
-- [ ] Monorepo structure
-- [ ] README
-- [ ] License
-- [ ] Basic Next.js app
-- [ ] Prisma SQLite setup
-- [ ] Capsule schema
-
-### Phase 1
-- [ ] Capsule CRUD
-- [ ] Dashboard UI
-- [ ] Search
-- [ ] Import/export
-
-### Phase 2
-- [ ] Browser extension
-- [ ] Capture selected text
-- [ ] Save to CTX
-- [ ] Inject capsule into AI chat input
-
-### Phase 3
-- [ ] MCP server
-- [ ] Claude Desktop support
-- [ ] Cursor support
-- [ ] Capsule retrieval tools
-
-### Phase 4
-- [ ] GitHub integration
-- [ ] Capsule versioning
-- [ ] Secret redaction
-- [ ] Semantic search
-
-### Phase 5
-- [ ] Team self-hosting
-- [ ] Encryption
-- [ ] Desktop app
-- [ ] VS Code extension
+- Browser extension packaging and store-ready permissions review.
+- Local embeddings and semantic search.
+- Capsule diff and merge.
+- Workspace-level redaction policies.
+- GitHub discussion capture.
+- More MCP resources and prompt templates.
 
 ## Contributing
 
-Contributions are welcome.
-
-Good first areas:
-
-- UI improvements
-- Capsule schema improvements
-- Browser extension support for more platforms
-- MCP tools
-- Documentation
-- Tests
-- Import/export formats
-
-Read `CONTRIBUTING.md` before opening a pull request.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT License.
-
-## Project Status
-
-CTX is in early development.
-
-The current goal is to build a strong MVP for local-first AI context portability.
+MIT. See [LICENSE](LICENSE).

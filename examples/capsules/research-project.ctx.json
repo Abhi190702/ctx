@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_research_project",
+  "title": "Research Paper Assistant",
+  "source": {
+    "type": "conversation",
+    "platform": "claude",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "Research OS"
+  },
+  "summary": "A paper assistant that turns messy reading notes into structured literature review memory.",
+  "goals": ["Track claims", "Preserve limitations", "Support literature reviews"],
+  "decisions": ["Use one capsule per paper"],
+  "constraints": ["Do not invent citations"],
+  "openQuestions": ["Should embeddings be local-only?"],
+  "nextSteps": ["Add citation fields"],
+  "tags": ["research", "papers"],
+  "content": {
+    "rawText": "Capture method, datasets, claims, limitations, and related work.",
+    "markdown": ""
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 55,
+    "importance": 5
+  }
+}

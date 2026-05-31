@@ -1,0 +1,45 @@
+body {
+  margin: 0;
+  background: #090b10;
+  color: #e5e7eb;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+main {
+  margin: 40px auto;
+  max-width: 680px;
+  padding: 24px;
+}
+
+form {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #232a36;
+  border-radius: 8px;
+  background: #10141d;
+}
+
+input,
+button {
+  min-height: 40px;
+  border: 1px solid #232a36;
+  border-radius: 8px;
+  background: #090b10;
+  color: #fff;
+  font: inherit;
+  padding: 0 12px;
+}
+
+button {
+  width: max-content;
+  background: #8bf5cf;
+  color: #090b10;
+  cursor: pointer;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #8bf5cf;
+  outline-offset: 2px;
+}

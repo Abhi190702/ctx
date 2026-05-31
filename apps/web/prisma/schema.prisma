@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  repository  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  capsules    Capsule[]
+
+  @@unique([name])
+}
+
+model Capsule {
+  id             String           @id @default(cuid())
+  title          String
+  description    String?
+  summary        String?
+  rawText        String?
+  markdown       String?
+  platform       String?
+  sourceUrl      String?
+  sourceType     String?
+  projectId      String?
+  status         String           @default("active")
+  schemaVersion  String           @default("0.1.0")
+  goals          String?
+  decisions      String?
+  constraints    String?
+  openQuestions  String?
+  nextSteps      String?
+  tags           String?
+  importance     Int              @default(0)
+  tokenEstimate  Int              @default(0)
+  lastInjectedAt DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions       CapsuleVersion[]
+  activities     Activity[]
+}
+
+model CapsuleVersion {
+  id         String   @id @default(cuid())
+  capsuleId  String
+  version    Int
+  snapshot   String
+  changeNote String?
+  createdAt  DateTime @default(now())
+  capsule    Capsule  @relation(fields: [capsuleId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  type      String
+  capsuleId String?
+  projectId String?
+  platform  String?
+  message   String
+  metadata  String?
+  createdAt DateTime @default(now())
+  capsule   Capsule? @relation(fields: [capsuleId], references: [id], onDelete: SetNull)
+}
+
+model GitHubCapture {
+  id        String   @id @default(cuid())
+  type      String
+  owner     String
+  repo      String
+  number    Int?
+  title     String
+  url       String
+  rawData   String
+  capsuleId String?
+  createdAt DateTime @default(now())
+}

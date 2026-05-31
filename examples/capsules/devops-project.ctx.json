@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ctx_devops_project",
+  "title": "Kubernetes Auto-Healing Dashboard",
+  "description": "Project memory capsule",
+  "source": {
+    "type": "conversation",
+    "platform": "chatgpt",
+    "url": "https://chatgpt.com/example",
+    "capturedAt": "2026-05-31T10:00:00.000Z"
+  },
+  "project": {
+    "name": "KubeHeal",
+    "repository": "https://github.com/example/kubeheal"
+  },
+  "summary": "The user is building a Kubernetes dashboard with monitoring and AI remediation.",
+  "goals": ["Monitor workloads", "Explain incidents", "Inject runbook context"],
+  "decisions": ["Use SQLite for local context", "Keep remediation suggestions read-only"],
+  "constraints": ["Do not capture cluster secrets"],
+  "openQuestions": ["Which metrics backend ships first?"],
+  "nextSteps": ["Add incident model", "Create monitor UI"],
+  "tags": ["devops", "kubernetes", "monitoring"],
+  "content": {
+    "rawText": "KubeHeal should preserve incident context and AI remediation notes.",
+    "markdown": "## Runbook\nCapture symptoms, likely cause, and next action."
+  },
+  "metadata": {
+    "createdAt": "2026-05-31T10:00:00.000Z",
+    "updatedAt": "2026-05-31T10:00:00.000Z",
+    "version": 1,
+    "tokenEstimate": 72,
+    "importance": 6
+  }
+}
