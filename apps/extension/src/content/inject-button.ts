@@ -1,5 +1,6 @@
 import { captureCurrentContext } from "../services/capture";
 import { openCapsulePicker } from "../services/capsule-picker";
+import { getCtxAppUrl, pingCtx } from "../services/ctx-api";
 import { detectPlatform } from "../services/platform-detector";
 import { findPrompt } from "./platform-selectors";
 
@@ -16,6 +17,9 @@ export function mountCtxButton() {
   host.style.zIndex = "2147483647";
   document.documentElement.append(host);
   buttonHost = host;
+  placeButton(host);
+  window.addEventListener("resize", () => placeButton(host), { passive: true });
+  window.addEventListener("scroll", () => placeButton(host), { passive: true });
 
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `
@@ -39,7 +43,7 @@ export function mountCtxButton() {
         position: absolute;
         right: 58px;
         bottom: 0;
-        width: 224px;
+        width: 238px;
         display: none;
         overflow: hidden;
         border: 1px solid #283044;
@@ -63,6 +67,13 @@ export function mountCtxButton() {
       }
       .menu button:hover { background: rgba(255,255,255,.06); }
       .icon { color: #8bf5cf; font-size: 18px; line-height: 1; }
+      .status {
+        margin: 0;
+        padding: 10px 16px 12px;
+        border-top: 1px solid #283044;
+        color: #9ca3af;
+        font: 700 11px/1.4 ui-sans-serif, system-ui, sans-serif;
+      }
       .toast {
         position: absolute;
         right: 0;
@@ -83,7 +94,9 @@ export function mountCtxButton() {
     <div class="wrap">
       <section class="menu" aria-label="CTX actions">
         <button type="button" class="generate"><span class="icon">+</span><span>Generate</span></button>
-        <button type="button" class="drop"><span class="icon">v</span><span>Drop</span></button>
+        <button type="button" class="drop"><span class="icon">></span><span>Drop</span></button>
+        <button type="button" class="open"><span class="icon">o</span><span>Open CTX</span></button>
+        <p class="status">Local CTX memory</p>
       </section>
       <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">CTX</button>
       <div class="toast" role="status" aria-live="polite"></div>
@@ -93,25 +106,61 @@ export function mountCtxButton() {
   const launcher = root.querySelector(".launcher") as HTMLButtonElement;
   const menu = root.querySelector(".menu") as HTMLElement;
   const toast = root.querySelector(".toast") as HTMLElement;
+  const status = root.querySelector(".status") as HTMLElement;
 
   launcher.addEventListener("click", () => {
     menuOpen = !menuOpen;
     menu.dataset.open = String(menuOpen);
+    if (menuOpen) void refreshStatus(status);
   });
 
   root.querySelector(".generate")?.addEventListener("click", async () => {
     menuOpen = false;
     menu.dataset.open = "false";
+    if (!(await pingCtx())) {
+      showToast(toast, "Start CTX on localhost:3000 first.");
+      return;
+    }
     showToast(toast, "Generating capsule...");
-    const result = await captureCurrentContext();
-    showToast(toast, result.ok ? "Capsule generated" : result.error ?? "Capture failed");
+    try {
+      const result = await captureCurrentContext();
+      showToast(toast, result.ok ? "Capsule generated" : result.error ?? "Capture failed");
+    } catch (error) {
+      showToast(toast, error instanceof Error ? error.message : "Capture failed");
+    }
   });
 
-  root.querySelector(".drop")?.addEventListener("click", () => {
+  root.querySelector(".drop")?.addEventListener("click", async () => {
     menuOpen = false;
     menu.dataset.open = "false";
+    if (!(await pingCtx())) {
+      showToast(toast, "Start CTX on localhost:3000 first.");
+      return;
+    }
     openCapsulePicker(findPrompt(detectPlatform()));
   });
+
+  root.querySelector(".open")?.addEventListener("click", async () => {
+    menuOpen = false;
+    menu.dataset.open = "false";
+    window.open(await getCtxAppUrl(), "_blank", "noopener,noreferrer");
+  });
+}
+
+function placeButton(host: HTMLElement) {
+  const prompt = findPrompt(detectPlatform());
+  const rect = prompt?.getBoundingClientRect();
+  if (!rect || rect.width < 120 || rect.height < 24) {
+    host.style.right = "20px";
+    host.style.bottom = "22px";
+    return;
+  }
+  host.style.right = `${Math.max(16, window.innerWidth - rect.right + 8)}px`;
+  host.style.bottom = `${Math.max(16, window.innerHeight - rect.bottom + 6)}px`;
+}
+
+async function refreshStatus(status: HTMLElement) {
+  status.textContent = (await pingCtx()) ? "Connected to CTX" : "CTX app is not running";
 }
 
 function showToast(toast: HTMLElement, text: string) {

@@ -1,6 +1,39 @@
 import { safeJsonParseArray } from "@ctx/core";
 import { prisma } from "./db";
 
+type SearchableCapsule = {
+  title?: string | null;
+  description?: string | null;
+  summary?: string | null;
+  rawText?: string | null;
+  markdown?: string | null;
+  platform?: string | null;
+  sourceUrl?: string | null;
+  tags?: string | string[] | null;
+  project?: { name?: string | null } | null;
+};
+
+const semanticAliases: Record<string, string[]> = {
+  ai: ["chatgpt", "claude", "gemini", "cursor", "assistant", "agent"],
+  agent: ["assistant", "cursor", "codex", "automation"],
+  bug: ["error", "failed", "failure", "fix", "debug", "issue", "exception"],
+  capture: ["generate", "save", "import", "clip", "selection"],
+  chrome: ["extension", "browser", "plugin"],
+  ci: ["actions", "workflow", "build", "test", "pipeline"],
+  code: ["coding", "developer", "repo", "repository", "implementation"],
+  drop: ["inject", "insert", "prompt", "reuse"],
+  extension: ["chrome", "browser", "plugin", "toolbar"],
+  github: ["git", "repo", "repository", "pull", "pr", "issue", "commit", "review"],
+  import: ["upload", "file", "paste", "conversation", "export"],
+  memory: ["capsule", "context", "handoff", "notes", "knowledge"],
+  pr: ["pull", "review", "github", "thread", "comment"],
+  project: ["workspace", "repo", "repository", "app"],
+  search: ["find", "retrieve", "lookup", "semantic"],
+  summary: ["summarize", "recap", "brief", "handoff"]
+};
+
+const stopWords = new Set(["a", "an", "and", "are", "for", "from", "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "with"]);
+
 export async function searchCapsules(query: string) {
   const q = query.trim().toLowerCase();
   const capsules = await prisma.capsule.findMany({
@@ -10,23 +43,76 @@ export async function searchCapsules(query: string) {
 
   if (!q) return capsules;
 
-  return capsules.filter((capsule) => {
-    const tags = safeJsonParseArray(capsule.tags).join(" ");
-    const haystack = [
-      capsule.title,
-      capsule.description,
-      capsule.summary,
-      capsule.rawText,
-      capsule.markdown,
-      capsule.platform,
-      capsule.sourceUrl,
-      tags,
-      capsule.project?.name
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+  return capsules
+    .map((capsule) => ({ capsule, score: scoreCapsuleForSearch(capsule, q) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(({ capsule }) => capsule);
+}
 
-    return haystack.includes(q);
-  });
+export function scoreCapsuleForSearch(capsule: SearchableCapsule, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return 1;
+
+  const terms = expandTerms(tokenize(q));
+  if (!terms.length) return 0;
+
+  const fields = [
+    { value: capsule.title, weight: 12 },
+    { value: capsule.project?.name, weight: 10 },
+    { value: tagsText(capsule.tags), weight: 9 },
+    { value: capsule.summary, weight: 7 },
+    { value: capsule.description, weight: 6 },
+    { value: capsule.platform, weight: 5 },
+    { value: capsule.markdown, weight: 4 },
+    { value: capsule.sourceUrl, weight: 3 },
+    { value: capsule.rawText, weight: 2 }
+  ];
+
+  let score = 0;
+  for (const field of fields) {
+    const value = normalize(field.value);
+    if (!value) continue;
+    if (value.includes(q)) score += field.weight * 3;
+    const words = tokenize(value, true);
+    for (const term of terms) {
+      if (value.includes(term)) score += field.weight;
+      else if (hasLooseWordMatch(words, term)) score += field.weight * 0.45;
+    }
+  }
+
+  return Math.round(score * 100) / 100;
+}
+
+function tagsText(tags: SearchableCapsule["tags"]) {
+  if (Array.isArray(tags)) return tags.join(" ");
+  return safeJsonParseArray(tags).join(" ");
+}
+
+function normalize(value: string | null | undefined) {
+  return value?.toLowerCase().replace(/[_-]+/g, " ").trim() ?? "";
+}
+
+function tokenize(value: string, keepStopWords = false) {
+  return value
+    .toLowerCase()
+    .match(/[a-z0-9]+/g)
+    ?.filter((term) => term.length > 1 && (keepStopWords || !stopWords.has(term))) ?? [];
+}
+
+function expandTerms(terms: string[]) {
+  const expanded = new Set<string>();
+  for (const term of terms) {
+    expanded.add(term);
+    for (const alias of semanticAliases[term] ?? []) expanded.add(alias);
+    for (const [key, aliases] of Object.entries(semanticAliases)) {
+      if (aliases.includes(term)) expanded.add(key);
+    }
+  }
+  return [...expanded];
+}
+
+function hasLooseWordMatch(words: string[], term: string) {
+  if (term.length < 4) return false;
+  return words.some((word) => word.length >= 4 && (word.startsWith(term.slice(0, 4)) || term.startsWith(word.slice(0, 4))));
 }

@@ -8,6 +8,7 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "pnpm db:push && pnpm --filter @ctx/web dev",
+    "start": "pnpm --filter @ctx/web start",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
@@ -17,6 +18,7 @@
     "db:seed": "pnpm --filter @ctx/web db:seed",
     "db:reset": "pnpm --filter @ctx/web db:reset",
     "web:dev": "pnpm db:push && pnpm --filter @ctx/web dev",
+    "web:start": "pnpm --filter @ctx/web start",
     "mcp:dev": "pnpm --filter @ctx/mcp-server dev",
     "extension:dev": "pnpm --filter @ctx/extension dev"
   },

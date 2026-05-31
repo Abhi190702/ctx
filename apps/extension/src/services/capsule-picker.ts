@@ -26,6 +26,8 @@ export async function openCapsulePicker(target: HTMLElement | null) {
       button { font: inherit; border: 1px solid #283044; border-radius: 10px; background: #0b1020; color: #e5e7eb; cursor: pointer; }
       button:hover { border-color: rgba(139,245,207,.55); }
       button:focus-visible { outline: 2px solid #8bf5cf; outline-offset: 2px; }
+      .actions { display: flex; align-items: center; gap: 8px; }
+      .refresh { height: 32px; padding: 0 10px; color: #8bf5cf; font-size: 12px; font-weight: 800; }
       .close { width: 32px; height: 32px; }
       input { box-sizing: border-box; width: calc(100% - 32px); margin: 14px 16px; border: 1px solid #283044; border-radius: 12px; background: #050816; color: #fff; padding: 11px 12px; font: inherit; }
       .list { max-height: 390px; overflow: auto; padding: 0 16px 16px; }
@@ -41,7 +43,10 @@ export async function openCapsulePicker(target: HTMLElement | null) {
           <h2>Drop Capsule</h2>
           <p class="summary">Click a capsule to insert it into the chat.</p>
         </div>
-        <button class="close" aria-label="Close">x</button>
+        <div class="actions">
+          <button class="refresh" aria-label="Refresh capsules">Refresh</button>
+          <button class="close" aria-label="Close">x</button>
+        </div>
       </header>
       <input type="search" aria-label="Search capsules" placeholder="Search capsules..." />
       <div class="list"><p class="status">Loading capsules...</p></div>
@@ -49,22 +54,42 @@ export async function openCapsulePicker(target: HTMLElement | null) {
   `;
 
   root.querySelector(".close")?.addEventListener("click", closeCapsulePicker);
+  root.querySelector(".refresh")?.addEventListener("click", () => void loadCapsules());
   const input = root.querySelector("input") as HTMLInputElement;
   const list = root.querySelector(".list") as HTMLDivElement;
+  let capsules: Capsule[] = [];
 
-  try {
-    const capsules = await fetchCapsules();
-    render(capsules);
-    input.addEventListener("input", () => {
-      const q = input.value.toLowerCase();
-      render(capsules.filter((capsule) => searchable(capsule).includes(q)));
-    });
-  } catch (error) {
-    list.innerHTML = `<p class="status">${error instanceof Error ? error.message : "Could not load capsules. Keep CTX running on localhost:3000."}</p>`;
+  await loadCapsules();
+  input.addEventListener("input", () => renderFiltered());
+
+  async function loadCapsules() {
+    renderStatus("Loading capsules...");
+    try {
+      capsules = await fetchCapsules();
+      renderFiltered();
+    } catch (error) {
+      renderStatus(error instanceof Error ? error.message : "Could not load capsules. Keep CTX running on localhost:3000.");
+    }
+  }
+
+  function renderFiltered() {
+    const q = input.value.toLowerCase().trim();
+    render(q ? capsules.filter((capsule) => searchable(capsule).includes(q)) : capsules);
+  }
+
+  function renderStatus(message: string) {
+    const status = document.createElement("p");
+    status.className = "status";
+    status.textContent = message;
+    list.replaceChildren(status);
   }
 
   function render(capsules: Capsule[]) {
-    list.innerHTML = capsules.length ? "" : `<p class="status">No capsules yet. Use Generate first.</p>`;
+    list.innerHTML = "";
+    if (!capsules.length) {
+      renderStatus(input.value.trim() ? "No matching capsules." : "No capsules yet. Use Generate first.");
+      return;
+    }
     for (const capsule of capsules) {
       const button = document.createElement("button");
       button.className = "item";

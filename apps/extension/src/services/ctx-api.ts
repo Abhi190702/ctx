@@ -1,6 +1,21 @@
 import type { Capsule } from "../types";
 import { getSettings } from "./storage";
 
+export async function pingCtx(): Promise<boolean> {
+  const { apiUrl } = await getSettings();
+  try {
+    const response = await fetch(`${apiUrl}/health`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function getCtxAppUrl(): Promise<string> {
+  const { apiUrl } = await getSettings();
+  return apiUrl;
+}
+
 export async function fetchCapsules(): Promise<Capsule[]> {
   const { apiUrl } = await getSettings();
   const response = await fetch(`${apiUrl}/capsules`);

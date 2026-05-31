@@ -2,6 +2,25 @@
 
 CTX should become the easiest way to capture, carry, search, and reuse AI working memory across tools. The product direction is comfort first: users should not manually fill long forms unless they choose the advanced path.
 
+## Current Progress Snapshot
+
+Implemented now:
+
+- Local-first web app with dashboard, capsule list, project pages, search, monitor, settings, import, export, delete, edit, and injection preview.
+- Fast capsule creator with paste, clipboard import, file import, generated preview, quick save, and optional advanced manual editor.
+- Deterministic capsule intelligence that generates title, summary, tags, project hints, goals, decisions, constraints, open questions, next steps, source metadata, importance, and markdown notes without requiring an API key.
+- Chrome extension content button with Generate, Drop, Open CTX, health checks, clearer failure states, refreshable capsule picker, and prompt insertion/copy fallback.
+- GitHub capture flow for repositories, PRs, issues, README-style context, and coding-agent handoff capsules.
+- Version timeline, latest-version diff, activity history, backup export/restore, MCP server tools, and project memory views.
+
+Still needs production polish:
+
+- Native-feeling extension placement for every supported platform.
+- Optional hosted AI extraction with user-owned API keys and local fallback.
+- True local embeddings for semantic search, duplicate detection, and related capsules.
+- Archive, bulk cleanup, restore previous version, scheduled backups, and signed extension packaging.
+- More guided onboarding with a first-run checklist and interactive sample data toggle.
+
 ## Product Principles
 
 - Capture where the user already works.

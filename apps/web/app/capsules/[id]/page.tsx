@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Edit } from "lucide-react";
 import { formatCapsuleForInjection } from "@ctx/core";
 import { CapsuleFormatPreview } from "@/components/capsules/CapsuleFormatPreview";
+import { CapsuleDiff } from "@/components/capsules/CapsuleDiff";
 import { CapsulePreview } from "@/components/capsules/CapsulePreview";
 import { CapsuleTags } from "@/components/capsules/CapsuleTags";
 import { CapsuleVersionTimeline } from "@/components/capsules/CapsuleVersionTimeline";
@@ -59,6 +60,12 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
               <CardTitle>AI Injection Preview</CardTitle>
             </CardHeader>
             <CapsuleFormatPreview capsule={portable} />
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Latest Version Diff</CardTitle>
+            </CardHeader>
+            <CapsuleDiff versions={capsule.versions} />
           </Card>
         </div>
         <aside className="space-y-6">

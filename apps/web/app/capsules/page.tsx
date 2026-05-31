@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { listCapsules } from "@/lib/capsules";
+import { scoreCapsuleForSearch } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,11 @@ export default async function CapsulesPage({
   const q = (searchParams?.q ?? "").toLowerCase();
   const platform = searchParams?.platform;
   const tag = searchParams?.tag?.toLowerCase();
-  const capsules = (await listCapsules()).filter((capsule) => {
-    const haystack = [capsule.title, capsule.summary, capsule.rawText, capsule.markdown, safeJsonParseArray(capsule.tags).join(" ")]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return (!q || haystack.includes(q)) && (!platform || capsule.platform === platform) && (!tag || safeJsonParseArray(capsule.tags).includes(tag));
-  });
+  const capsules = (await listCapsules())
+    .map((capsule) => ({ capsule, score: q ? scoreCapsuleForSearch(capsule, q) : 1 }))
+    .filter(({ capsule, score }) => score > 0 && (!platform || capsule.platform === platform) && (!tag || safeJsonParseArray(capsule.tags).includes(tag)))
+    .sort((a, b) => b.score - a.score)
+    .map(({ capsule }) => capsule);
 
   return (
     <PageShell>
