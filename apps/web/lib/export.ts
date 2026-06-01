@@ -1,6 +1,7 @@
 import { toPortableCapsule } from "./capsules";
 import { prisma } from "./db";
 import { logActivity } from "./activity";
+import { buildBackupEnvelope } from "./backup";
 
 export async function exportCapsules(id?: string | null) {
   if (id) {
@@ -23,10 +24,13 @@ export async function exportCapsules(id?: string | null) {
     include: { project: true, versions: true },
     orderBy: { updatedAt: "desc" }
   });
+  const projects = await prisma.project.findMany({ orderBy: { updatedAt: "desc" } });
+  const portableCapsules = capsules.map(toPortableCapsule);
 
-  return {
+  return buildBackupEnvelope({
     schemaVersion: "0.1.0",
     exportedAt: new Date().toISOString(),
-    capsules: capsules.map(toPortableCapsule)
-  };
+    projects,
+    capsules: portableCapsules
+  });
 }

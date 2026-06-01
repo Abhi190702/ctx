@@ -42,6 +42,7 @@ export async function searchCapsules(query: string) {
 export async function searchCapsulesWithScores(query: string) {
   const q = query.trim().toLowerCase();
   const capsules = await prisma.capsule.findMany({
+    where: { status: "active" },
     include: { project: true, versions: true },
     orderBy: { updatedAt: "desc" }
   });
@@ -56,7 +57,7 @@ export async function searchCapsulesWithScores(query: string) {
 
 export async function getRelatedCapsules(capsule: SearchableCapsule & { id: string }, limit = 4) {
   const capsules = await prisma.capsule.findMany({
-    where: { id: { not: capsule.id } },
+    where: { id: { not: capsule.id }, status: "active" },
     include: { project: true, versions: true },
     orderBy: { updatedAt: "desc" },
     take: 100

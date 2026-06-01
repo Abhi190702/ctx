@@ -2,10 +2,10 @@ import { Card } from "@/components/ui/card";
 
 export function GitHubPreview() {
   const rows = [
-    ["Issue", "Title, body, state, labels, author, URL"],
-    ["Pull Request", "Title, body, base/head branches, merge state"],
+    ["Issue", "Title, body, state, labels, author, URL, and issue comments"],
+    ["Pull Request", "Title, body, base/head branches, merge state, reviews, inline threads, commits, and CI checks"],
     ["README", "Decoded markdown documentation"],
-    ["Repository", "Description, language, stars, topics, license"]
+    ["Repository", "Description, language, stars, topics, license, and recent releases"]
   ];
 
   return (

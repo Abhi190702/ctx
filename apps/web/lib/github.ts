@@ -9,6 +9,7 @@ import {
 import { createCapsule } from "./capsules";
 import { prisma } from "./db";
 import { logActivity } from "./activity";
+import { enrichGitHubCapsuleInput } from "./github-deep-context";
 
 const apiVersion = "2022-11-28";
 
@@ -41,6 +42,14 @@ async function githubFetch(path: string) {
   }
 
   return response.json();
+}
+
+async function optionalGitHubFetch(path: string) {
+  try {
+    return await githubFetch(path);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "GitHub request failed." };
+  }
 }
 
 export function getGitHubTokenStatus() {
@@ -80,15 +89,24 @@ export async function createCapsuleFromGitHubCapture(input: unknown) {
   if (type === "issue") {
     rawData = await fetchGitHubIssue(owner, repo, number!);
     capsuleInput = formatGitHubIssueAsCapsule(owner, repo, rawData);
+    const deepContext = await fetchIssueDeepContext(owner, repo, number!);
+    capsuleInput = enrichGitHubCapsuleInput(capsuleInput, deepContext);
+    rawData = { ...rawData, deepContext };
   } else if (type === "pull_request") {
     rawData = await fetchGitHubPullRequest(owner, repo, number!);
     capsuleInput = formatGitHubPullRequestAsCapsule(owner, repo, rawData);
+    const deepContext = await fetchPullRequestDeepContext(owner, repo, number!, rawData.head?.sha);
+    capsuleInput = enrichGitHubCapsuleInput(capsuleInput, deepContext);
+    rawData = { ...rawData, deepContext };
   } else if (type === "readme") {
     rawData = await fetchGitHubReadme(owner, repo);
     capsuleInput = formatGitHubReadmeAsCapsule(owner, repo, rawData.decoded, rawData.html_url);
   } else {
     rawData = await fetchGitHubRepository(owner, repo);
     capsuleInput = formatGitHubRepositoryAsCapsule(owner, repo, rawData);
+    const deepContext = await fetchRepositoryDeepContext(owner, repo);
+    capsuleInput = enrichGitHubCapsuleInput(capsuleInput, deepContext);
+    rawData = { ...rawData, deepContext };
   }
 
   const capsule = await createCapsule(
@@ -125,4 +143,36 @@ export async function createCapsuleFromGitHubCapture(input: unknown) {
   });
 
   return { capsule, githubCapture };
+}
+
+async function fetchIssueDeepContext(owner: string, repo: string, number: number) {
+  const issueComments = await optionalGitHubFetch(`/repos/${owner}/${repo}/issues/${number}/comments?per_page=100`);
+  return {
+    issueComments: Array.isArray(issueComments) ? issueComments : []
+  };
+}
+
+async function fetchPullRequestDeepContext(owner: string, repo: string, number: number, headSha?: string) {
+  const [issueComments, reviews, reviewComments, commits, checkRuns] = await Promise.all([
+    optionalGitHubFetch(`/repos/${owner}/${repo}/issues/${number}/comments?per_page=100`),
+    optionalGitHubFetch(`/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`),
+    optionalGitHubFetch(`/repos/${owner}/${repo}/pulls/${number}/comments?per_page=100`),
+    optionalGitHubFetch(`/repos/${owner}/${repo}/pulls/${number}/commits?per_page=100`),
+    headSha ? optionalGitHubFetch(`/repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`) : Promise.resolve({ check_runs: [] })
+  ]);
+
+  return {
+    issueComments: Array.isArray(issueComments) ? issueComments : [],
+    reviews: Array.isArray(reviews) ? reviews : [],
+    reviewComments: Array.isArray(reviewComments) ? reviewComments : [],
+    commits: Array.isArray(commits) ? commits : [],
+    checkRuns: Array.isArray((checkRuns as any).check_runs) ? (checkRuns as any).check_runs : []
+  };
+}
+
+async function fetchRepositoryDeepContext(owner: string, repo: string) {
+  const releases = await optionalGitHubFetch(`/repos/${owner}/${repo}/releases?per_page=10`);
+  return {
+    releases: Array.isArray(releases) ? releases : []
+  };
 }

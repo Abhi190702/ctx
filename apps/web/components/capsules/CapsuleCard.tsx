@@ -23,6 +23,9 @@ export function CapsuleCard({ capsule }: { capsule: any }) {
       <div className="mt-4">
         <CapsuleTags tags={capsule.tags} />
       </div>
+      {capsule.status === "archived" ? (
+        <p className="mt-4 rounded-lg border border-amber/30 bg-amber/10 px-3 py-2 text-xs font-medium text-amber">Archived memory</p>
+      ) : null}
       <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
           <Cpu aria-hidden="true" className="h-3.5 w-3.5" />

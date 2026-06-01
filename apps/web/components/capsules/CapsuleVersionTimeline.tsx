@@ -1,6 +1,9 @@
 import { formatDateTime } from "@/lib/utils";
+import { RestoreVersionButton } from "./RestoreVersionButton";
 
-export function CapsuleVersionTimeline({ versions }: { versions: any[] }) {
+export function CapsuleVersionTimeline({ capsuleId, versions }: { capsuleId: string; versions: any[] }) {
+  const latestVersion = Math.max(...versions.map((version) => version.version));
+
   return (
     <div className="space-y-3">
       {versions.map((version) => (
@@ -10,6 +13,11 @@ export function CapsuleVersionTimeline({ versions }: { versions: any[] }) {
             <span className="text-xs text-slate-500">{formatDateTime(version.createdAt)}</span>
           </div>
           <p className="mt-1 text-sm text-slate-400">{version.changeNote || "Snapshot saved."}</p>
+          {version.version !== latestVersion ? (
+            <div className="mt-3">
+              <RestoreVersionButton capsuleId={capsuleId} versionId={version.id} version={version.version} />
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

@@ -11,7 +11,10 @@ Implemented now:
 - Deterministic capsule intelligence that generates title, summary, tags, project hints, goals, decisions, constraints, open questions, next steps, source metadata, importance, and markdown notes without requiring an API key.
 - Chrome extension content button with Generate, Drop, Open CTX, health checks, clearer failure states, refreshable capsule picker, and prompt insertion/copy fallback.
 - GitHub capture flow for repositories, PRs, issues, README-style context, and coding-agent handoff capsules.
-- Version timeline, latest-version diff, activity history, backup export/restore, MCP server tools, and project memory views.
+- Project memory workspace with agent briefs, memory packs, task state, health signals, decisions, open questions, and next actions.
+- GitHub deep capture for issue comments, PR reviews, inline review threads, commits, CI checks, and repository release notes when API permissions allow.
+- Version timeline, latest-version diff, restore previous version, archive/restore, bulk cleanup, activity history, backup export/restore, MCP server tools, and project memory views.
+- Backup integrity envelopes, backup inspection before restore, database integrity checks, and local persistence health in settings.
 
 Still needs production polish:
 
@@ -19,6 +22,7 @@ Still needs production polish:
 - Optional hosted AI extraction with user-owned API keys and local fallback.
 - True local embeddings for semantic search, duplicate detection, and related capsules.
 - Archive, bulk cleanup, restore previous version, scheduled backups, and signed extension packaging.
+- Scheduled backups, encrypted bundles, cloud sync provider interface, and signed extension packaging.
 - More guided onboarding with a first-run checklist and interactive sample data toggle.
 
 ## Product Principles

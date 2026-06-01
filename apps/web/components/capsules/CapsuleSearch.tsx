@@ -1,8 +1,18 @@
 import { Search } from "lucide-react";
 
-export function CapsuleSearch({ defaultValue = "" }: { defaultValue?: string }) {
+export function CapsuleSearch({
+  defaultValue = "",
+  defaultPlatform = "",
+  defaultTag = "",
+  defaultStatus = "active"
+}: {
+  defaultValue?: string;
+  defaultPlatform?: string;
+  defaultTag?: string;
+  defaultStatus?: string;
+}) {
   return (
-    <form action="/capsules" className="mb-6 grid gap-3 md:grid-cols-[1fr_180px_180px]">
+    <form action="/capsules" className="mb-6 grid gap-3 md:grid-cols-[1fr_160px_160px_160px]">
       <label className="sr-only" htmlFor="capsule-search">
         Search Capsules
       </label>
@@ -24,7 +34,7 @@ export function CapsuleSearch({ defaultValue = "" }: { defaultValue?: string }) 
       <select
         id="platform-filter"
         name="platform"
-        defaultValue=""
+        defaultValue={defaultPlatform}
         className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       >
         <option value="">All Platforms</option>
@@ -43,9 +53,23 @@ export function CapsuleSearch({ defaultValue = "" }: { defaultValue?: string }) 
         name="tag"
         type="search"
         autoComplete="off"
+        defaultValue={defaultTag}
         placeholder="Tag..."
         className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       />
+      <label className="sr-only" htmlFor="status-filter">
+        Status
+      </label>
+      <select
+        id="status-filter"
+        name="status"
+        defaultValue={defaultStatus}
+        className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+      >
+        <option value="active">Active</option>
+        <option value="archived">Archived</option>
+        <option value="all">All Statuses</option>
+      </select>
     </form>
   );
 }

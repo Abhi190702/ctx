@@ -4,6 +4,7 @@ import { prisma } from "./db";
 export async function getStats() {
   const [capsules, projects, activities, totalInjections] = await Promise.all([
     prisma.capsule.findMany({
+      where: { status: "active" },
       include: { project: true },
       orderBy: { updatedAt: "desc" }
     }),

@@ -1,13 +1,36 @@
 import { importCapsule } from "@ctx/core";
 import { createCapsule } from "./capsules";
+import { inspectBackupPayload } from "./backup";
+import { prisma } from "./db";
 
 export async function importPortableCapsule(payload: unknown): Promise<unknown> {
   if (payload && typeof payload === "object" && Array.isArray((payload as { capsules?: unknown[] }).capsules)) {
+    const projects = Array.isArray((payload as { projects?: unknown[] }).projects) ? (payload as { projects: any[] }).projects : [];
+    for (const project of projects) {
+      if (typeof project?.name === "string" && project.name.trim()) {
+        await prisma.project.upsert({
+          where: { name: project.name },
+          update: {
+            description: typeof project.description === "string" ? project.description : undefined,
+            repository: typeof project.repository === "string" ? project.repository : undefined
+          },
+          create: {
+            name: project.name,
+            description: typeof project.description === "string" ? project.description : null,
+            repository: typeof project.repository === "string" ? project.repository : null
+          }
+        });
+      }
+    }
+
     const imported = [];
     for (const capsule of (payload as { capsules: unknown[] }).capsules) {
       imported.push(await importPortableCapsule(capsule));
     }
-    return imported;
+    return {
+      imported,
+      inspection: inspectBackupPayload(payload)
+    };
   }
 
   const capsule = importCapsule(payload);

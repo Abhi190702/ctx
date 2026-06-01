@@ -41,7 +41,7 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
         <div>
           <h2 className="text-lg font-semibold text-white">Create Capsule from GitHub</h2>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            Turn GitHub issues, pull requests, READMEs, and repository metadata into reusable AI memory.
+            Turn GitHub issues, pull requests, READMEs, comments, reviews, CI checks, and repository metadata into reusable AI memory.
           </p>
         </div>
         <span className={tokenConfigured ? "text-mint" : "text-amber"}>

@@ -7,6 +7,7 @@ import { CapsulePreview } from "@/components/capsules/CapsulePreview";
 import { RelatedCapsules } from "@/components/capsules/RelatedCapsules";
 import { CapsuleTags } from "@/components/capsules/CapsuleTags";
 import { CapsuleVersionTimeline } from "@/components/capsules/CapsuleVersionTimeline";
+import { ArchiveCapsuleButton } from "@/components/capsules/ArchiveCapsuleButton";
 import { DeleteCapsuleButton } from "@/components/capsules/DeleteCapsuleButton";
 import { ExportCapsuleButton } from "@/components/capsules/ExportCapsuleButton";
 import { InjectButton } from "@/components/capsules/InjectButton";
@@ -37,6 +38,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
           <div className="flex flex-wrap gap-2">
             <InjectButton text={injection} />
             <ExportCapsuleButton id={capsule.id} />
+            <ArchiveCapsuleButton id={capsule.id} archived={capsule.status === "archived"} />
             <DeleteCapsuleButton id={capsule.id} title={capsule.title} />
             <Link href={`/capsules/${capsule.id}/edit`}>
               <Button type="button" variant="secondary">
@@ -49,6 +51,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
       />
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-slate-400">
         <span>Platform: {capsule.platform || "manual"}</span>
+        <span>Status: {capsule.status || "active"}</span>
         <span>Tokens: {capsule.tokenEstimate}</span>
         <span>Updated: {formatDateTime(capsule.updatedAt)}</span>
       </div>
@@ -77,7 +80,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
             <CardHeader>
               <CardTitle>Version Timeline</CardTitle>
             </CardHeader>
-            <CapsuleVersionTimeline versions={capsule.versions} />
+            <CapsuleVersionTimeline capsuleId={capsule.id} versions={capsule.versions} />
           </Card>
           <Card>
             <CardHeader>

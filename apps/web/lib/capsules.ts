@@ -115,7 +115,13 @@ async function resolveProject(input: CreateCapsuleInput | UpdateCapsuleInput) {
 }
 
 export async function listCapsules() {
+  return listCapsulesByStatus();
+}
+
+export async function listCapsulesByStatus(options: { status?: "active" | "archived" | "all" } = {}) {
+  const status = options.status ?? "active";
   return prisma.capsule.findMany({
+    where: status === "all" ? undefined : { status },
     include: { project: true, versions: true },
     orderBy: { updatedAt: "desc" }
   });
@@ -168,7 +174,7 @@ export async function createQuickCapsule(input: unknown) {
   return createCapsule(draft, "Generated from quick capture");
 }
 
-export async function updateCapsule(id: string, input: unknown) {
+export async function updateCapsule(id: string, input: unknown, changeNote = "Capsule updated") {
   const parsed = UpdateCapsuleSchema.parse(input);
   const existing = await getCapsule(id);
   if (!existing) throw new Error("Capsule not found.");
@@ -190,7 +196,7 @@ export async function updateCapsule(id: string, input: unknown) {
       capsuleId: capsule.id,
       version,
       snapshot: JSON.stringify(toPortableCapsule(capsule), null, 2),
-      changeNote: "Capsule updated"
+      changeNote
     }
   });
   await logActivity({
@@ -202,6 +208,94 @@ export async function updateCapsule(id: string, input: unknown) {
   });
 
   return getCapsule(id);
+}
+
+export async function archiveCapsule(id: string, archived = true) {
+  const capsule = await prisma.capsule.update({
+    where: { id },
+    data: { status: archived ? "archived" : "active" },
+    include: { project: true, versions: true }
+  });
+
+  await logActivity({
+    type: archived ? "capsule_archived" : "capsule_restored",
+    capsuleId: capsule.id,
+    projectId: capsule.projectId,
+    platform: capsule.platform,
+    message: `${archived ? "Archived" : "Restored"} capsule "${capsule.title}"`
+  });
+
+  return getCapsule(id);
+}
+
+export async function restoreCapsuleVersion(id: string, versionId: string) {
+  const version = await prisma.capsuleVersion.findFirst({
+    where: { id: versionId, capsuleId: id }
+  });
+  if (!version) throw new Error("Capsule version not found.");
+
+  const snapshot = CapsuleSchema.parse(JSON.parse(version.snapshot));
+  return updateCapsule(
+    id,
+    {
+      title: snapshot.title,
+      description: snapshot.description,
+      summary: snapshot.summary,
+      platform: snapshot.source?.platform,
+      sourceUrl: snapshot.source?.url,
+      sourceType: snapshot.source?.type,
+      projectName: snapshot.project?.name,
+      repository: snapshot.project?.repository,
+      goals: snapshot.goals,
+      decisions: snapshot.decisions,
+      constraints: snapshot.constraints,
+      openQuestions: snapshot.openQuestions,
+      nextSteps: snapshot.nextSteps,
+      tags: snapshot.tags,
+      rawText: snapshot.content.rawText,
+      markdown: snapshot.content.markdown,
+      importance: snapshot.metadata.importance
+    },
+    `Restored version ${version.version}`
+  );
+}
+
+export async function bulkUpdateCapsules(input: { ids: string[]; action: "archive" | "restore" | "delete" }) {
+  const ids = [...new Set(input.ids)].filter(Boolean);
+  if (!ids.length) throw new Error("Select at least one capsule.");
+
+  const capsules = await prisma.capsule.findMany({ where: { id: { in: ids } } });
+  if (!capsules.length) throw new Error("No matching capsules found.");
+
+  if (input.action === "delete") {
+    await Promise.all(
+      capsules.map((capsule) =>
+        logActivity({
+          type: "capsule_deleted",
+          platform: capsule.platform,
+          message: `Deleted capsule "${capsule.title}" via bulk cleanup`
+        })
+      )
+    );
+    await prisma.capsule.deleteMany({ where: { id: { in: capsules.map((capsule) => capsule.id) } } });
+    return { action: input.action, count: capsules.length };
+  }
+
+  const status = input.action === "archive" ? "archived" : "active";
+  await prisma.capsule.updateMany({ where: { id: { in: capsules.map((capsule) => capsule.id) } }, data: { status } });
+  await Promise.all(
+    capsules.map((capsule) =>
+      logActivity({
+        type: input.action === "archive" ? "capsule_archived" : "capsule_restored",
+        capsuleId: capsule.id,
+        projectId: capsule.projectId,
+        platform: capsule.platform,
+        message: `${input.action === "archive" ? "Archived" : "Restored"} capsule "${capsule.title}" via bulk cleanup`
+      })
+    )
+  );
+
+  return { action: input.action, count: capsules.length };
 }
 
 export async function deleteCapsule(id: string) {

@@ -1,8 +1,13 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageShell } from "@/components/layout/PageShell";
 import { Card } from "@/components/ui/card";
+import { getDatabaseIntegrity } from "@/lib/persistence";
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const integrity = await getDatabaseIntegrity();
+
   return (
     <PageShell>
       <PageHeader title="Settings" description="Local-first controls for API, extension, privacy, and redaction." />
@@ -31,6 +36,19 @@ export default function SettingsPage() {
           <p className="mt-3 text-sm leading-6 text-slate-400">
             Load apps/extension/dist as an unpacked extension after running pnpm extension:dev or pnpm --filter @ctx/extension build.
           </p>
+        </Card>
+        <Card>
+          <h2 className="text-lg font-semibold text-white">Persistence Health</h2>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div>
+              <dt className="text-slate-500">Database</dt>
+              <dd className={integrity.ok ? "text-mint" : "text-rose"}>{integrity.ok ? "Integrity OK" : "Needs repair"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Stored Memory</dt>
+              <dd className="text-slate-200">{integrity.capsules} capsules · {integrity.projects} projects · {integrity.activities} activity rows</dd>
+            </div>
+          </dl>
         </Card>
         <Card>
           <h2 className="text-lg font-semibold text-white">Redaction Toggle</h2>
