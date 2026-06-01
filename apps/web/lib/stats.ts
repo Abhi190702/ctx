@@ -2,16 +2,16 @@ import { safeJsonParseArray } from "@ctx/core";
 import { prisma } from "./db";
 
 export async function getStats() {
-  const [capsules, projects, activities] = await Promise.all([
+  const [capsules, projects, activities, totalInjections] = await Promise.all([
     prisma.capsule.findMany({
       include: { project: true },
       orderBy: { updatedAt: "desc" }
     }),
     prisma.project.findMany({ include: { capsules: true } }),
-    prisma.activity.findMany({ orderBy: { createdAt: "desc" }, take: 25 })
+    prisma.activity.findMany({ orderBy: { createdAt: "desc" }, take: 25 }),
+    prisma.activity.count({ where: { type: "capsule_injected" } })
   ]);
 
-  const injections = activities.filter((activity) => activity.type === "capsule_injected").length;
   const platformDistribution = capsules.reduce<Record<string, number>>((acc, capsule) => {
     const key = capsule.platform ?? "manual";
     acc[key] = (acc[key] ?? 0) + 1;
@@ -27,7 +27,7 @@ export async function getStats() {
   return {
     totalCapsules: capsules.length,
     totalProjects: projects.length,
-    totalInjections: injections,
+    totalInjections,
     supportedPlatforms: 8,
     highTokenCapsules: highToken,
     capsulesMissingSummary: missingSummary,

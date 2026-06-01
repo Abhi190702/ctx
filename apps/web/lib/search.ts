@@ -35,18 +35,38 @@ const semanticAliases: Record<string, string[]> = {
 const stopWords = new Set(["a", "an", "and", "are", "for", "from", "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "with"]);
 
 export async function searchCapsules(query: string) {
+  const results = await searchCapsulesWithScores(query);
+  return results.map(({ capsule }) => capsule);
+}
+
+export async function searchCapsulesWithScores(query: string) {
   const q = query.trim().toLowerCase();
   const capsules = await prisma.capsule.findMany({
     include: { project: true, versions: true },
     orderBy: { updatedAt: "desc" }
   });
 
-  if (!q) return capsules;
+  if (!q) return capsules.map((capsule) => ({ capsule, score: 1 }));
 
   return capsules
     .map((capsule) => ({ capsule, score: scoreCapsuleForSearch(capsule, q) }))
     .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score);
+}
+
+export async function getRelatedCapsules(capsule: SearchableCapsule & { id: string }, limit = 4) {
+  const capsules = await prisma.capsule.findMany({
+    where: { id: { not: capsule.id } },
+    include: { project: true, versions: true },
+    orderBy: { updatedAt: "desc" },
+    take: 100
+  });
+
+  return capsules
+    .map((candidate) => ({ capsule: candidate, score: scoreRelatedCapsule(capsule, candidate) }))
+    .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
     .map(({ capsule }) => capsule);
 }
 
@@ -84,6 +104,28 @@ export function scoreCapsuleForSearch(capsule: SearchableCapsule, query: string)
   return Math.round(score * 100) / 100;
 }
 
+export function scoreRelatedCapsule(source: SearchableCapsule, target: SearchableCapsule) {
+  const sourceTags = new Set(tagsText(source.tags).split(" ").filter(Boolean));
+  const targetTags = new Set(tagsText(target.tags).split(" ").filter(Boolean));
+  const sharedTags = [...sourceTags].filter((tag) => targetTags.has(tag));
+  const query = [
+    source.title,
+    source.summary,
+    source.project?.name,
+    [...sourceTags].join(" ")
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  let score = scoreCapsuleForSearch(target, query) * 0.28;
+  if (source.project?.name && source.project.name === target.project?.name) score += 24;
+  score += sharedTags.length * 12;
+  if (source.platform && source.platform === target.platform) score += 6;
+  if (source.sourceUrl && target.sourceUrl && urlHost(source.sourceUrl) === urlHost(target.sourceUrl)) score += 5;
+
+  return Math.round(score * 100) / 100;
+}
+
 function tagsText(tags: SearchableCapsule["tags"]) {
   if (Array.isArray(tags)) return tags.join(" ");
   return safeJsonParseArray(tags).join(" ");
@@ -115,4 +157,12 @@ function expandTerms(terms: string[]) {
 function hasLooseWordMatch(words: string[], term: string) {
   if (term.length < 4) return false;
   return words.some((word) => word.length >= 4 && (word.startsWith(term.slice(0, 4)) || term.startsWith(word.slice(0, 4))));
+}
+
+function urlHost(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }

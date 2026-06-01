@@ -1,6 +1,7 @@
 "use client";
 
-import { ClipboardPaste, FileUp, Save, Settings2, Sparkles, Wand2 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, ClipboardPaste, FileUp, Save, Settings2, Sparkles, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { CapsuleForm } from "./CapsuleForm";
@@ -23,6 +24,19 @@ type DraftCapsule = {
   openQuestions?: string[] | string;
   nextSteps?: string[] | string;
   importance?: number;
+  review?: CapsuleReview;
+};
+
+type CapsuleReview = {
+  qualityScore: number;
+  warnings: string[];
+  strengths: string[];
+  duplicateCandidates: Array<{
+    id: string;
+    title: string;
+    reason: string;
+    score: number;
+  }>;
 };
 
 export function QuickCapsuleCreator() {
@@ -55,7 +69,8 @@ export function QuickCapsuleCreator() {
     setBusy(true);
     setMessage("");
     try {
-      const payload = await postJson("/api/capsules", draft);
+      const { review: _review, ...capsuleInput } = draft;
+      const payload = await postJson("/api/capsules", capsuleInput);
       router.push(`/capsules/${payload.data.id}`);
       router.refresh();
     } catch (error) {
@@ -244,7 +259,7 @@ function QualityChecklist({ draft }: { draft: DraftCapsule }) {
     { label: "Next steps", ok: arrayText(draft.nextSteps).trim().length > 0 },
     { label: "Source", ok: Boolean(draft.sourceUrl?.trim()) }
   ];
-  const score = Math.round((checks.filter((check) => check.ok).length / checks.length) * 100);
+  const score = draft.review?.qualityScore ?? Math.round((checks.filter((check) => check.ok).length / checks.length) * 100);
 
   return (
     <div className="rounded-lg border border-line bg-white/[0.03] p-3">
@@ -259,6 +274,38 @@ function QualityChecklist({ draft }: { draft: DraftCapsule }) {
           </span>
         ))}
       </div>
+      {draft.review?.warnings.length ? (
+        <div className="mt-4 space-y-2 border-t border-line pt-3">
+          {draft.review.warnings.slice(0, 4).map((warning) => (
+            <p key={warning} className="flex gap-2 text-xs leading-5 text-amber">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{warning}</span>
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 flex gap-2 border-t border-line pt-3 text-xs font-medium text-mint">
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+          <span>Review looks ready to save.</span>
+        </p>
+      )}
+      {draft.review?.duplicateCandidates.length ? (
+        <div className="mt-4 border-t border-line pt-3">
+          <p className="text-xs font-semibold text-slate-300">Possible duplicates</p>
+          <div className="mt-2 space-y-2">
+            {draft.review.duplicateCandidates.map((candidate) => (
+              <Link
+                key={candidate.id}
+                href={`/capsules/${candidate.id}`}
+                className="block rounded-lg border border-amber/30 bg-amber/10 p-2 text-xs text-amber hover:border-amber/60"
+              >
+                <span className="font-semibold">{candidate.title}</span>
+                <span className="mt-1 block text-amber/80">{candidate.score}% match: {candidate.reason}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

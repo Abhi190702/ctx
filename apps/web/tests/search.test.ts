@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { safeJsonParseArray } from "@ctx/core";
-import { scoreCapsuleForSearch } from "../lib/search";
+import { scoreCapsuleForSearch, scoreRelatedCapsule } from "../lib/search";
 
 describe("search data helpers", () => {
   it("parses json tags", () => {
@@ -19,5 +19,26 @@ describe("search data helpers", () => {
     );
 
     expect(score).toBeGreaterThan(0);
+  });
+
+  it("scores related capsules by shared project and tags", () => {
+    const score = scoreRelatedCapsule(
+      {
+        title: "Extension Drop Flow",
+        summary: "One click drop from ChatGPT.",
+        tags: "[\"extension\",\"drop\"]",
+        platform: "chatgpt",
+        project: { name: "ctx" }
+      },
+      {
+        title: "Chrome Capsule Picker",
+        summary: "Search and inject memory into AI chats.",
+        tags: "[\"extension\",\"chrome\",\"drop\"]",
+        platform: "chatgpt",
+        project: { name: "ctx" }
+      }
+    );
+
+    expect(score).toBeGreaterThan(30);
   });
 });

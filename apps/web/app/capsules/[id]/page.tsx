@@ -4,6 +4,7 @@ import { formatCapsuleForInjection } from "@ctx/core";
 import { CapsuleFormatPreview } from "@/components/capsules/CapsuleFormatPreview";
 import { CapsuleDiff } from "@/components/capsules/CapsuleDiff";
 import { CapsulePreview } from "@/components/capsules/CapsulePreview";
+import { RelatedCapsules } from "@/components/capsules/RelatedCapsules";
 import { CapsuleTags } from "@/components/capsules/CapsuleTags";
 import { CapsuleVersionTimeline } from "@/components/capsules/CapsuleVersionTimeline";
 import { DeleteCapsuleButton } from "@/components/capsules/DeleteCapsuleButton";
@@ -14,6 +15,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCapsule, toPortableCapsule } from "@/lib/capsules";
+import { getRelatedCapsules } from "@/lib/search";
 import { formatDateTime } from "@/lib/utils";
 import { notFound } from "next/navigation";
 
@@ -24,6 +26,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
   if (!capsule) notFound();
   const portable = toPortableCapsule(capsule);
   const injection = formatCapsuleForInjection(portable);
+  const relatedCapsules = await getRelatedCapsules(capsule);
 
   return (
     <PageShell>
@@ -67,6 +70,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
             </CardHeader>
             <CapsuleDiff versions={capsule.versions} />
           </Card>
+          <RelatedCapsules capsules={relatedCapsules} />
         </div>
         <aside className="space-y-6">
           <Card>

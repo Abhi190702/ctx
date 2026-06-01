@@ -6,8 +6,12 @@ export type Capsule = {
   summary?: string;
   rawText?: string;
   markdown?: string;
-  tags?: string;
+  tags?: string | string[];
   platform?: string;
+  tokenEstimate?: number;
+  updatedAt?: string;
+  lastInjectedAt?: string | null;
+  project?: { name?: string | null } | null;
 };
 
 export type ExtensionSettings = {
