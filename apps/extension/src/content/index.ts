@@ -125,64 +125,96 @@ function mountCtxButton() {
       :host { all: initial; color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       .wrap { position: relative; display: flex; align-items: flex-end; gap: 10px; }
       .launcher {
-        width: 48px;
-        height: 48px;
+        width: 38px;
+        height: 38px;
         display: grid;
         place-items: center;
         overflow: hidden;
-        border: 1px solid rgba(139,245,207,.58);
+        border: 1px solid rgba(139,245,207,.55);
         border-radius: 999px;
         background: radial-gradient(circle at 35% 22%, rgba(139,245,207,.20), rgba(5,8,18,.96) 58%);
         cursor: pointer;
-        box-shadow: 0 14px 40px rgba(0,0,0,.42), 0 0 0 4px rgba(139,245,207,.08);
+        box-shadow: 0 10px 28px rgba(0,0,0,.34), 0 0 0 3px rgba(139,245,207,.07);
+        transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease;
       }
-      .launcher:hover { filter: brightness(1.04); transform: translateY(-1px); }
+      .launcher:hover {
+        border-color: rgba(139,245,207,.80);
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+        box-shadow: 0 12px 32px rgba(0,0,0,.38), 0 0 0 4px rgba(139,245,207,.10);
+      }
       .launcher:focus-visible, .menu button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
       .launcher img {
-        width: 35px;
-        height: 35px;
+        width: 27px;
+        height: 27px;
         display: block;
         object-fit: contain;
       }
+      .fallback-label {
+        display: none;
+        color: #8bf5cf;
+        font: 900 11px/1 ui-sans-serif, system-ui, sans-serif;
+      }
+      .launcher.fallback img { display: none; }
+      .launcher.fallback .fallback-label { display: block; }
       .menu {
         position: absolute;
-        right: 54px;
-        bottom: 0;
-        width: 236px;
+        right: 0;
+        bottom: 48px;
+        width: 224px;
         display: none;
         overflow: hidden;
         border: 1px solid #283044;
-        border-radius: 14px;
-        background: #111827;
-        box-shadow: 0 24px 90px rgba(0,0,0,.52);
+        border-radius: 16px;
+        background: rgba(17,24,39,.96);
+        box-shadow: 0 22px 76px rgba(0,0,0,.50);
+        backdrop-filter: blur(14px);
       }
       .menu[data-open="true"] { display: block; }
       .menu button {
         width: 100%;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         border: 0;
         background: transparent;
         color: #e5e7eb;
-        padding: 14px 16px;
+        padding: 12px 14px;
         text-align: left;
-        font: 800 14px ui-sans-serif, system-ui, sans-serif;
+        font: 760 13px/1.25 ui-sans-serif, system-ui, sans-serif;
         cursor: pointer;
       }
       .menu button:hover { background: rgba(255,255,255,.06); }
-      .icon { color: #8bf5cf; font-size: 18px; line-height: 1; }
+      .icon {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 8px;
+        background: rgba(139,245,207,.10);
+        color: #8bf5cf;
+      }
+      .icon svg {
+        width: 14px;
+        height: 14px;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
       .status {
         margin: 0;
-        padding: 10px 16px 12px;
+        padding: 10px 14px 12px;
         border-top: 1px solid #283044;
         color: #9ca3af;
-        font: 700 11px/1.4 ui-sans-serif, system-ui, sans-serif;
+        font: 650 11px/1.4 ui-sans-serif, system-ui, sans-serif;
       }
       .toast {
         position: absolute;
         right: 0;
-        bottom: 54px;
+        bottom: 48px;
         min-width: 210px;
         max-width: 300px;
         display: none;
@@ -198,13 +230,14 @@ function mountCtxButton() {
     </style>
     <div class="wrap">
       <section class="menu" aria-label="CTX actions">
-        <button type="button" class="generate"><span class="icon">+</span><span>Generate Capsule</span></button>
-        <button type="button" class="drop"><span class="icon">v</span><span>Drop Capsule</span></button>
-        <button type="button" class="open"><span class="icon">o</span><span>Open CTX</span></button>
+        <button type="button" class="generate"><span class="icon">${plusIcon()}</span><span>Generate Capsule</span></button>
+        <button type="button" class="drop"><span class="icon">${dropIcon()}</span><span>Drop Capsule</span></button>
+        <button type="button" class="open"><span class="icon">${openIcon()}</span><span>Open CTX</span></button>
         <p class="status">Local CTX memory</p>
       </section>
       <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">
         <img src="${markUrl}" alt="" />
+        <span class="fallback-label">CTX</span>
       </button>
       <div class="toast" role="status" aria-live="polite"></div>
     </div>
@@ -214,6 +247,10 @@ function mountCtxButton() {
   const menu = root.querySelector(".menu") as HTMLElement;
   const toast = root.querySelector(".toast") as HTMLElement;
   const status = root.querySelector(".status") as HTMLElement;
+  const logo = root.querySelector(".launcher img") as HTMLImageElement;
+
+  logo.addEventListener("error", () => launcher.classList.add("fallback"));
+  logo.addEventListener("load", () => launcher.classList.remove("fallback"));
 
   launcher.addEventListener("click", () => {
     menuOpen = !menuOpen;
@@ -259,11 +296,23 @@ function placeButton(host: HTMLElement) {
   const rect = prompt?.getBoundingClientRect();
   if (!rect || rect.width < 120 || rect.height < 24) {
     host.style.right = "20px";
-    host.style.bottom = "86px";
+    host.style.bottom = "84px";
     return;
   }
-  host.style.right = `${Math.max(16, window.innerWidth - rect.right + 10)}px`;
-  host.style.bottom = `${Math.max(18, window.innerHeight - rect.bottom + 10)}px`;
+  host.style.right = `${Math.max(14, window.innerWidth - rect.right + 12)}px`;
+  host.style.bottom = `${Math.max(16, window.innerHeight - rect.bottom + 14)}px`;
+}
+
+function plusIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+}
+
+function dropIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v12M7 12l5 5 5-5M6 20h12"/></svg>';
+}
+
+function openIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h8v8M16 8 7 17"/></svg>';
 }
 
 function findPrompt(platform: Platform): HTMLElement | null {
