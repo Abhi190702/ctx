@@ -37,12 +37,162 @@ type Capsule = {
 
 type DropMode = "smart" | "brief" | "full";
 
-const launcherSize = 28;
-const launcherGap = 8;
-let buttonHost: HTMLElement | null = null;
+type InsertPosition = "before" | "after";
+
+type PlatformToolbarConfig = {
+  toolbarSelectors: string[];
+  refSelectors: string[];
+  insertPosition: InsertPosition;
+};
+
+const CTX_BUTTON_ID = "ctx-patchpilot-btn";
+const CTX_SHELL_ID = "ctx-patchpilot-shell";
+const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
+const defaultLauncherSize = 28;
+let injectionObserver: MutationObserver | null = null;
+let fallbackTimer: number | null = null;
+let retryTimer: number | null = null;
+let retryAttempts = 0;
+let lastUrl = location.href;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
-const ctxWindow = window as Window & { __CTX_CONTENT_READY__?: boolean; __CTX_CONTENT_LISTENER_READY__?: boolean };
+const ctxWindow = window as Window & {
+  __CTX_CONTENT_READY__?: boolean;
+  __CTX_CONTENT_LISTENER_READY__?: boolean;
+  __CTX_NAVIGATION_WATCHER_READY__?: boolean;
+};
+
+const genericToolbarConfig: PlatformToolbarConfig = {
+  toolbarSelectors: [
+    "form div:has(button)",
+    "form div:has([role='button'])",
+    "[role='textbox'] ~ div",
+    "textarea ~ div",
+    "div:has(> button[aria-label*='send' i])",
+    "div:has(> button[aria-label*='voice' i])",
+    "div:has(> button[aria-label*='mic' i])"
+  ],
+  refSelectors: [
+    "button[aria-label*='microphone' i]",
+    "button[aria-label*='mic' i]",
+    "button[aria-label*='voice' i]",
+    "button[aria-label*='audio' i]",
+    "button[aria-label*='send' i]",
+    "button[type='submit']",
+    "[role='button'][aria-label*='send' i]",
+    "[role='button'][aria-label*='voice' i]"
+  ],
+  insertPosition: "before"
+};
+
+const PLATFORM_CONFIG: Record<string, PlatformToolbarConfig> = {
+  "chat.openai.com": {
+    toolbarSelectors: [
+      "form[data-type='unified-composer'] [data-testid='composer-footer-actions']",
+      "form[data-type='unified-composer'] div:has(> button[data-testid='composer-speech-button'])",
+      "form[data-type='unified-composer'] div:has(> button[aria-label*='dictate' i])",
+      "form[data-type='unified-composer'] div:has(> button[data-testid='send-button'])",
+      "[data-testid='composer'] div:has(> button[aria-label*='voice' i])",
+      "[data-testid='composer'] div:has(> button[data-testid='send-button'])"
+    ],
+    refSelectors: [
+      "button[data-testid='composer-speech-button']",
+      "button[aria-label*='dictate' i]",
+      "button[aria-label*='microphone' i]",
+      "button[aria-label*='voice' i]",
+      "button[data-testid='send-button']",
+      "button[aria-label*='send' i]"
+    ],
+    insertPosition: "before"
+  },
+  "chatgpt.com": {
+    toolbarSelectors: [
+      "form[data-type='unified-composer'] [data-testid='composer-footer-actions']",
+      "form[data-type='unified-composer'] div:has(> button[data-testid='composer-speech-button'])",
+      "form[data-type='unified-composer'] div:has(> button[aria-label*='dictate' i])",
+      "form[data-type='unified-composer'] div:has(> button[data-testid='send-button'])",
+      "[data-testid='composer'] div:has(> button[aria-label*='voice' i])",
+      "[data-testid='composer'] div:has(> button[data-testid='send-button'])"
+    ],
+    refSelectors: [
+      "button[data-testid='composer-speech-button']",
+      "button[aria-label*='dictate' i]",
+      "button[aria-label*='microphone' i]",
+      "button[aria-label*='voice' i]",
+      "button[data-testid='send-button']",
+      "button[aria-label*='send' i]"
+    ],
+    insertPosition: "before"
+  },
+  "gemini.google.com": {
+    toolbarSelectors: [
+      ".input-area-container .trailing-actions",
+      ".input-area-container div:has(> voice-input-toggle)",
+      ".input-area-container div:has(> button[aria-label*='microphone' i])",
+      ".input-area-container div:has(> button[aria-label*='voice' i])",
+      "div:has(> button[aria-label*='Ask Gemini' i])",
+      "div:has(> voice-input-toggle)"
+    ],
+    refSelectors: [
+      "voice-input-toggle",
+      "button[aria-label*='microphone' i]",
+      "button[aria-label*='mic' i]",
+      "button[aria-label*='voice' i]",
+      "button[aria-label*='send' i]",
+      "button[aria-label*='submit' i]"
+    ],
+    insertPosition: "before"
+  },
+  "claude.ai": {
+    toolbarSelectors: [
+      "[data-testid*='composer'] div:has(> button[aria-label*='mic' i])",
+      "[data-testid*='composer'] div:has(> button[aria-label*='voice' i])",
+      "[data-testid*='chat-input'] div:has(> button[aria-label*='mic' i])",
+      "fieldset div:has(> button[aria-label*='mic' i])",
+      "fieldset div:has(> button[aria-label*='voice' i])",
+      "form div:has(> button[aria-label*='mic' i])"
+    ],
+    refSelectors: [
+      "button[aria-label*='microphone' i]",
+      "button[aria-label*='mic' i]",
+      "button[aria-label*='voice' i]",
+      "button[aria-label*='audio' i]",
+      "button[aria-label*='send' i]",
+      "button[type='submit']"
+    ],
+    insertPosition: "before"
+  },
+  "replit.com": {
+    toolbarSelectors: [
+      "[data-cy*='ai'] div:has(> button)",
+      "[data-testid*='ai'] div:has(> button)",
+      "form div:has(> button[aria-label*='send' i])",
+      "form div:has(> button[aria-label*='voice' i])"
+    ],
+    refSelectors: genericToolbarConfig.refSelectors,
+    insertPosition: "before"
+  },
+  "perplexity.ai": genericToolbarConfig,
+  "www.perplexity.ai": genericToolbarConfig,
+  "notebooklm.google.com": genericToolbarConfig,
+  "chat.deepseek.com": genericToolbarConfig,
+  "grok.com": genericToolbarConfig,
+  "poe.com": genericToolbarConfig,
+  "chat.mistral.ai": genericToolbarConfig,
+  "copilot.microsoft.com": genericToolbarConfig,
+  "www.meta.ai": genericToolbarConfig,
+  "chat.qwen.ai": genericToolbarConfig,
+  "lovable.dev": genericToolbarConfig,
+  "app.emergent.sh": genericToolbarConfig,
+  "v0.dev": genericToolbarConfig,
+  "bolt.new": genericToolbarConfig,
+  "cursor.com": genericToolbarConfig,
+  "github.com": {
+    toolbarSelectors: ["form div:has(> button[type='submit'])", "form div:has(> button)", "form"],
+    refSelectors: ["button[type='submit']", "button[aria-label*='comment' i]", "button"],
+    insertPosition: "before"
+  }
+};
 
 const promptSelectors: Record<Platform, string[]> = {
   chatgpt: [
@@ -99,8 +249,8 @@ if (ctxWindow.__CTX_CONTENT_READY__) {
 
 ctxWindow.__CTX_CONTENT_READY__ = true;
 
-const observer = new MutationObserver(() => safeMountCtxButton());
-observer.observe(document.documentElement, { childList: true, subtree: true });
+installNavigationWatcher();
+startInjectionWatcher();
 safeMountCtxButton();
 
 function registerMessageListener() {
@@ -109,8 +259,9 @@ function registerMessageListener() {
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "ctx:ping-content") {
-      safeMountCtxButton();
-      sendResponse({ ok: true });
+      const injected = safeMountCtxButton();
+      if (!injected) startInjectionWatcher();
+      sendResponse({ ok: true, injected });
       return false;
     }
     if (message?.type === "ctx:capture-selection") {
@@ -127,10 +278,96 @@ function registerMessageListener() {
 
 function safeMountCtxButton() {
   try {
-    mountCtxButton();
+    return mountCtxButton();
   } catch (error) {
     console.warn("CTX could not mount the launcher.", error);
+    return false;
   }
+}
+
+function installNavigationWatcher() {
+  if (ctxWindow.__CTX_NAVIGATION_WATCHER_READY__) return;
+  ctxWindow.__CTX_NAVIGATION_WATCHER_READY__ = true;
+
+  window.addEventListener("popstate", scheduleNavigationReset, { passive: true });
+  window.addEventListener("hashchange", scheduleNavigationReset, { passive: true });
+
+  const originalPushState = history.pushState.bind(history);
+  history.pushState = ((...args: Parameters<History["pushState"]>) => {
+    const result = originalPushState(...args);
+    scheduleNavigationReset();
+    return result;
+  }) as History["pushState"];
+
+  const originalReplaceState = history.replaceState.bind(history);
+  history.replaceState = ((...args: Parameters<History["replaceState"]>) => {
+    const result = originalReplaceState(...args);
+    scheduleNavigationReset();
+    return result;
+  }) as History["replaceState"];
+}
+
+function scheduleNavigationReset() {
+  window.setTimeout(() => {
+    if (lastUrl === location.href) return;
+    lastUrl = location.href;
+    resetInjectionState();
+  }, 80);
+}
+
+function resetInjectionState() {
+  stopInjectionWatcher();
+  document.getElementById(CTX_BUTTON_ID)?.closest(`#${CTX_SHELL_ID}`)?.remove();
+  menuOpen = false;
+  startInjectionWatcher();
+  safeMountCtxButton();
+}
+
+function startInjectionWatcher() {
+  if (document.getElementById(CTX_BUTTON_ID)) {
+    stopInjectionWatcher();
+    return;
+  }
+
+  if (!document.body) {
+    window.setTimeout(startInjectionWatcher, 100);
+    return;
+  }
+
+  injectionObserver?.disconnect();
+  injectionObserver = new MutationObserver(() => {
+    if (safeMountCtxButton()) stopInjectionWatcher();
+  });
+  injectionObserver.observe(document.body, { childList: true, subtree: true });
+
+  if (fallbackTimer) window.clearTimeout(fallbackTimer);
+  fallbackTimer = window.setTimeout(() => {
+    fallbackTimer = null;
+    if (!document.getElementById(CTX_BUTTON_ID)) startRetryLoop();
+  }, 5000);
+}
+
+function startRetryLoop() {
+  if (retryTimer) return;
+  retryAttempts = 0;
+  retryTimer = window.setInterval(() => {
+    retryAttempts += 1;
+    if (safeMountCtxButton() || retryAttempts >= 30) stopInjectionWatcher();
+  }, 500);
+}
+
+function stopInjectionWatcher() {
+  injectionObserver?.disconnect();
+  injectionObserver = null;
+  if (fallbackTimer) {
+    window.clearTimeout(fallbackTimer);
+    fallbackTimer = null;
+  }
+  if (retryTimer) {
+    window.clearInterval(retryTimer);
+    retryTimer = null;
+  }
+  retryAttempts = 0;
 }
 
 function detectPlatform(host = location.hostname): Platform {
@@ -158,75 +395,106 @@ function detectPlatform(host = location.hostname): Platform {
 }
 
 function mountCtxButton() {
-  if (buttonHost?.isConnected) {
-    placeButton(buttonHost);
-    return;
+  cleanupLegacyLaunchers();
+
+  const slot = findToolbarSlot();
+  const existingButton = document.getElementById(CTX_BUTTON_ID) as HTMLButtonElement | null;
+  const existingShell = existingButton?.closest<HTMLElement>(`#${CTX_SHELL_ID}`) ?? null;
+
+  if (existingButton?.isConnected && existingShell?.isConnected) {
+    if (slot) {
+      insertLauncherShell(existingShell, slot);
+      syncLauncherMetrics(existingShell, existingButton, slot.refElement);
+    }
+    stopInjectionWatcher();
+    return true;
   }
 
-  const existingHost = document.querySelector<HTMLElement>("[data-ctx-extension='launcher']");
-  if (existingHost?.isConnected) {
-    buttonHost = existingHost;
-    placeButton(existingHost);
-    return;
-  }
+  if (!slot) return false;
 
-  const host = document.createElement("div");
-  host.dataset.ctxExtension = "launcher";
-  host.style.position = "fixed";
-  host.style.left = `${window.innerWidth - launcherSize - 20}px`;
-  host.style.top = `${window.innerHeight - launcherSize - 84}px`;
-  host.style.width = `${launcherSize}px`;
-  host.style.height = `${launcherSize}px`;
-  host.style.zIndex = "2147483647";
-  document.documentElement.append(host);
-  buttonHost = host;
-  placeButton(host);
-  window.addEventListener("resize", () => placeButton(host), { passive: true });
-  window.addEventListener("scroll", () => placeButton(host), { passive: true });
+  const shell = createLauncherShell(slot.refElement);
+  insertLauncherShell(shell, slot);
+  stopInjectionWatcher();
+  return true;
+}
 
-  const root = host.attachShadow({ mode: "open" });
+function createLauncherShell(refElement: HTMLElement) {
+  const shell = document.createElement("span");
+  shell.id = CTX_SHELL_ID;
+  shell.dataset.ctxExtension = "launcher";
   const markUrl = chrome.runtime.getURL("assets/ctx-mark.png");
-  root.innerHTML = `
+  shell.innerHTML = `
     <style>
-      :host { all: initial; color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-      .wrap { position: relative; display: flex; align-items: flex-end; gap: 10px; }
-      .launcher {
-        width: 28px;
-        height: 28px;
-        display: grid;
-        place-items: center;
+      #${CTX_SHELL_ID} {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        flex-shrink: 0 !important;
+        position: relative !important;
+        width: auto !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        vertical-align: middle !important;
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #${CTX_BUTTON_ID} {
+        all: unset;
+        position: static !important;
+        width: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        height: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        min-width: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        min-height: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        max-width: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        max-height: var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        flex-shrink: 0 !important;
+        margin: 0 2px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        vertical-align: middle !important;
         overflow: hidden;
-        border: 1px solid rgba(139,245,207,.55);
-        border-radius: 999px;
+        border: 1px solid rgba(139,245,207,.58);
+        border-radius: var(--ctx-toolbar-button-radius, 999px);
         background: radial-gradient(circle at 35% 22%, rgba(139,245,207,.20), rgba(5,8,18,.96) 58%);
+        color: #8bf5cf;
         cursor: pointer;
         box-shadow: 0 5px 16px rgba(0,0,0,.28), 0 0 0 2px rgba(139,245,207,.06);
         transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease;
       }
-      .launcher:hover {
-        border-color: rgba(139,245,207,.80);
+      #${CTX_BUTTON_ID}:hover {
+        border-color: rgba(139,245,207,.84);
         filter: brightness(1.05);
         transform: translateY(-1px);
         box-shadow: 0 8px 22px rgba(0,0,0,.34), 0 0 0 3px rgba(139,245,207,.09);
       }
-      .launcher:focus-visible, .menu button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
-      .launcher img {
-        width: 19px;
-        height: 19px;
+      #${CTX_BUTTON_ID}:focus-visible, #${CTX_SHELL_ID} .menu button:focus-visible {
+        outline: 2px solid #5eead4;
+        outline-offset: 2px;
+      }
+      #${CTX_BUTTON_ID} img {
+        width: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) * .68);
+        height: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) * .68);
         display: block;
         object-fit: contain;
       }
-      .fallback-label {
+      #${CTX_BUTTON_ID} .fallback-label {
         display: none;
         color: #8bf5cf;
-        font: 900 11px/1 ui-sans-serif, system-ui, sans-serif;
+        font: 900 10px/1 ui-sans-serif, system-ui, sans-serif;
       }
-      .launcher.fallback img { display: none; }
-      .launcher.fallback .fallback-label { display: block; }
-      .menu {
+      #${CTX_BUTTON_ID}.fallback img { display: none; }
+      #${CTX_BUTTON_ID}.fallback .fallback-label { display: block; }
+      #${CTX_SHELL_ID} .menu {
         position: absolute;
         right: 0;
-        bottom: 36px;
+        bottom: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 8px);
         width: 216px;
         display: none;
         overflow: hidden;
@@ -235,17 +503,18 @@ function mountCtxButton() {
         background: rgba(17,24,39,.96);
         box-shadow: 0 18px 62px rgba(0,0,0,.48);
         backdrop-filter: blur(14px);
+        z-index: 2147483647;
       }
-      .menu[data-open="true"] { display: block; }
-      :host([data-platform="claude"]) .menu {
+      #${CTX_SHELL_ID} .menu[data-open="true"] { display: block; }
+      #${CTX_SHELL_ID}[data-platform="claude"] .menu {
         bottom: auto;
-        top: 36px;
+        top: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 8px);
       }
-      :host([data-platform="claude"]) .toast {
+      #${CTX_SHELL_ID}[data-platform="claude"] .toast {
         bottom: auto;
-        top: 36px;
+        top: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 8px);
       }
-      .menu button {
+      #${CTX_SHELL_ID} .menu button {
         width: 100%;
         display: flex;
         align-items: center;
@@ -258,8 +527,8 @@ function mountCtxButton() {
         font: 740 13px/1.25 ui-sans-serif, system-ui, sans-serif;
         cursor: pointer;
       }
-      .menu button:hover { background: rgba(255,255,255,.06); }
-      .icon {
+      #${CTX_SHELL_ID} .menu button:hover { background: rgba(255,255,255,.06); }
+      #${CTX_SHELL_ID} .icon {
         width: 21px;
         height: 21px;
         display: grid;
@@ -269,7 +538,7 @@ function mountCtxButton() {
         background: rgba(139,245,207,.10);
         color: #8bf5cf;
       }
-      .icon svg {
+      #${CTX_SHELL_ID} .icon svg {
         width: 14px;
         height: 14px;
         stroke: currentColor;
@@ -278,17 +547,17 @@ function mountCtxButton() {
         stroke-linecap: round;
         stroke-linejoin: round;
       }
-      .status {
+      #${CTX_SHELL_ID} .status {
         margin: 0;
         padding: 9px 13px 11px;
         border-top: 1px solid #283044;
         color: #9ca3af;
         font: 650 11px/1.4 ui-sans-serif, system-ui, sans-serif;
       }
-      .toast {
+      #${CTX_SHELL_ID} .toast {
         position: absolute;
         right: 0;
-        bottom: 36px;
+        bottom: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 8px);
         min-width: 210px;
         max-width: 300px;
         display: none;
@@ -299,40 +568,43 @@ function mountCtxButton() {
         padding: 10px 12px;
         font: 700 12px ui-sans-serif, system-ui, sans-serif;
         box-shadow: 0 14px 44px rgba(0,0,0,.42);
+        z-index: 2147483647;
       }
-      .toast[data-show="true"] { display: block; }
+      #${CTX_SHELL_ID} .toast[data-show="true"] { display: block; }
     </style>
-    <div class="wrap">
-      <section class="menu" aria-label="CTX actions">
-        <button type="button" class="generate"><span class="icon">${plusIcon()}</span><span>Generate Capsule</span></button>
-        <button type="button" class="drop"><span class="icon">${dropIcon()}</span><span>Drop Capsule</span></button>
-        <button type="button" class="open"><span class="icon">${openIcon()}</span><span>Open CTX</span></button>
-        <p class="status">Local CTX memory</p>
-      </section>
-      <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">
-        <img src="${markUrl}" alt="" />
-        <span class="fallback-label">CTX</span>
-      </button>
-      <div class="toast" role="status" aria-live="polite"></div>
-    </div>
+    <button type="button" id="${CTX_BUTTON_ID}" title="CTX memory" aria-label="CTX memory">
+      <img src="${markUrl}" alt="" />
+      <span class="fallback-label">CTX</span>
+    </button>
+    <section class="menu" aria-label="CTX actions">
+      <button type="button" class="generate"><span class="icon">${plusIcon()}</span><span>Generate Capsule</span></button>
+      <button type="button" class="drop"><span class="icon">${dropIcon()}</span><span>Drop Capsule</span></button>
+      <button type="button" class="open"><span class="icon">${openIcon()}</span><span>Open CTX</span></button>
+      <p class="status">Local CTX memory</p>
+    </section>
+    <div class="toast" role="status" aria-live="polite"></div>
   `;
 
-  const launcher = root.querySelector(".launcher") as HTMLButtonElement;
-  const menu = root.querySelector(".menu") as HTMLElement;
-  const toast = root.querySelector(".toast") as HTMLElement;
-  const status = root.querySelector(".status") as HTMLElement;
-  const logo = root.querySelector(".launcher img") as HTMLImageElement;
+  const launcher = shell.querySelector(`#${CTX_BUTTON_ID}`) as HTMLButtonElement;
+  const menu = shell.querySelector(".menu") as HTMLElement;
+  const toast = shell.querySelector(".toast") as HTMLElement;
+  const status = shell.querySelector(".status") as HTMLElement;
+  const logo = shell.querySelector(`#${CTX_BUTTON_ID} img`) as HTMLImageElement;
+
+  syncLauncherMetrics(shell, launcher, refElement);
 
   logo.addEventListener("error", () => launcher.classList.add("fallback"));
   logo.addEventListener("load", () => launcher.classList.remove("fallback"));
 
-  launcher.addEventListener("click", () => {
+  launcher.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     menuOpen = !menuOpen;
     menu.dataset.open = String(menuOpen);
     if (menuOpen) void refreshStatus(status);
   });
 
-  root.querySelector(".generate")?.addEventListener("click", async () => {
+  shell.querySelector(".generate")?.addEventListener("click", async () => {
     menuOpen = false;
     menu.dataset.open = "false";
     if (!(await pingCtx())) {
@@ -348,7 +620,7 @@ function mountCtxButton() {
     }
   });
 
-  root.querySelector(".drop")?.addEventListener("click", async () => {
+  shell.querySelector(".drop")?.addEventListener("click", async () => {
     menuOpen = false;
     menu.dataset.open = "false";
     if (!(await pingCtx())) {
@@ -358,27 +630,13 @@ function mountCtxButton() {
     await openCapsulePicker(findPrompt(detectPlatform()));
   });
 
-  root.querySelector(".open")?.addEventListener("click", async () => {
+  shell.querySelector(".open")?.addEventListener("click", async () => {
     menuOpen = false;
     menu.dataset.open = "false";
     window.open(await getCtxAppUrl(), "_blank", "noopener,noreferrer");
   });
-}
 
-function placeButton(host: HTMLElement) {
-  const platform = detectPlatform();
-  const prompt = findPrompt(platform);
-  const composer = findComposer(platform, prompt);
-  const anchor = composer ? findActionAnchor(composer, platform) : null;
-  const position = anchor ?? fallbackPosition();
-  host.dataset.platform = platform;
-
-  host.style.left = `${Math.round(position.left)}px`;
-  host.style.top = `${Math.round(position.top)}px`;
-  host.style.right = "auto";
-  host.style.bottom = "auto";
-  host.style.width = `${launcherSize}px`;
-  host.style.height = `${launcherSize}px`;
+  return shell;
 }
 
 function plusIcon() {
@@ -417,261 +675,135 @@ function findPrompt(platform: Platform): HTMLElement | null {
   })[0] ?? null;
 }
 
-function findComposer(platform: Platform, prompt: HTMLElement | null): DOMRect | null {
-  if (prompt) {
-    const promptRect = prompt.getBoundingClientRect();
-    let node: HTMLElement | null = prompt;
-    for (let depth = 0; node && depth < 10; depth++) {
-      const rect = node.getBoundingClientRect();
-      if (isComposerRect(rect, promptRect)) return rect;
-      node = node.parentElement;
-    }
-  }
+type ToolbarSlot = {
+  toolbar: HTMLElement;
+  refElement: HTMLElement;
+  insertPosition: InsertPosition;
+};
 
-  return findComposerBySelector(platform);
+function findToolbarSlot(): ToolbarSlot | null {
+  const config = getToolbarConfig();
+  return findSlotFromToolbars(config) ?? findSlotFromReferences(config) ?? findSlotFromToolbars(genericToolbarConfig) ?? findSlotFromReferences(genericToolbarConfig);
 }
 
-function findComposerBySelector(platform: Platform): DOMRect | null {
-  const selectors: Record<Platform, string[]> = {
-    chatgpt: [
-      "form[data-type='unified-composer']",
-      "[data-testid='composer']",
-      "[data-testid='composer-footer-actions']",
-      "form"
-    ],
-    claude: ["[data-testid*='composer']", "[data-testid*='chat-input']", "fieldset", "form"],
-    gemini: [
-      "rich-textarea",
-      "[data-test-id*='input']",
-      "[data-testid*='input']",
-      "form"
-    ],
-    perplexity: ["form", "[data-testid*='input']"],
-    github: ["form", "textarea"],
-    cursor: ["form", "textarea"],
-    copilot: ["form", "textarea", "[contenteditable='true']"],
-    deepseek: ["form", "textarea", "[contenteditable='true']"],
-    grok: ["form", "textarea", "[contenteditable='true']"],
-    poe: ["form", "textarea", "[contenteditable='true']"],
-    mistral: ["form", "textarea", "[contenteditable='true']"],
-    meta: ["form", "textarea", "[contenteditable='true']"],
-    qwen: ["form", "textarea", "[contenteditable='true']"],
-    lovable: ["form", "textarea", "[contenteditable='true']"],
-    replit: ["form", "textarea", "[contenteditable='true']"],
-    emergent: ["form", "textarea", "[contenteditable='true']"],
-    v0: ["form", "textarea", "[contenteditable='true']"],
-    bolt: ["form", "textarea", "[contenteditable='true']"],
-    notebooklm: ["form", "textarea", "[contenteditable='true']"],
-    generic: ["form", "textarea", "[contenteditable='true']"]
-  };
+function getToolbarConfig(host = location.hostname) {
+  const normalized = host.toLowerCase();
+  const exact = PLATFORM_CONFIG[normalized];
+  if (exact) return exact;
 
-  const candidates: DOMRect[] = [];
-  for (const selector of [...(selectors[platform] ?? []), ...selectors.generic]) {
-    for (const element of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
-      const rect = element.getBoundingClientRect();
-      if (isVisibleRect(rect) && rect.width > 220 && rect.height >= 40 && rect.height <= 240) candidates.push(rect);
-    }
-  }
-
-  return candidates.sort((a, b) => {
-    const bottomScore = b.bottom - a.bottom;
-    if (Math.abs(bottomScore) > 20) return bottomScore;
-    return b.width * b.height - a.width * a.height;
-  })[0] ?? null;
+  const suffixMatch = Object.entries(PLATFORM_CONFIG).find(([hostname]) => normalized.endsWith(`.${hostname}`));
+  return suffixMatch?.[1] ?? genericToolbarConfig;
 }
 
-function isComposerRect(rect: DOMRect, promptRect: DOMRect) {
-  return (
-    isVisibleRect(rect) &&
-    rect.width >= Math.max(220, promptRect.width + 80) &&
-    rect.height >= 44 &&
-    rect.height <= 240 &&
-    rect.bottom >= promptRect.bottom - 16 &&
-    rect.top <= promptRect.top + 24
-  );
+function findSlotFromToolbars(config: PlatformToolbarConfig): ToolbarSlot | null {
+  for (const toolbarSelector of config.toolbarSelectors) {
+    for (const toolbar of queryVisibleElements(toolbarSelector)) {
+      if (isInsideCtxLauncher(toolbar)) continue;
+      const refElement = findReferenceElement(toolbar, config.refSelectors) ?? findReferenceElement(toolbar, genericToolbarConfig.refSelectors);
+      if (!refElement) continue;
+      return { toolbar, refElement, insertPosition: config.insertPosition };
+    }
+  }
+  return null;
+}
+
+function findSlotFromReferences(config: PlatformToolbarConfig): ToolbarSlot | null {
+  for (const refSelector of config.refSelectors) {
+    for (const refElement of queryVisibleElements(refSelector)) {
+      if (isInsideCtxLauncher(refElement)) continue;
+      const toolbar = findToolbarForReference(refElement, config);
+      if (!toolbar) continue;
+      return { toolbar, refElement, insertPosition: config.insertPosition };
+    }
+  }
+  return null;
+}
+
+function findReferenceElement(toolbar: HTMLElement, refSelectors: string[]) {
+  for (const refSelector of refSelectors) {
+    if (matchesSelector(toolbar, refSelector) && isVisibleElement(toolbar)) return toolbar;
+    const refElement = queryVisibleElements(refSelector, toolbar).find((element) => !isInsideCtxLauncher(element));
+    if (refElement) return refElement;
+  }
+  return null;
+}
+
+function findToolbarForReference(refElement: HTMLElement, config: PlatformToolbarConfig) {
+  let node: HTMLElement | null = refElement.parentElement;
+  for (let depth = 0; node && depth < 8; depth += 1) {
+    if (isInsideCtxLauncher(node)) return null;
+    if (config.toolbarSelectors.some((selector) => matchesSelector(node!, selector)) && isUsableToolbar(node)) return node;
+    if (isUsableToolbar(node)) return node;
+    node = node.parentElement;
+  }
+  return refElement.parentElement;
+}
+
+function isUsableToolbar(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  if (!isVisibleRect(rect) || rect.width < 32 || rect.height < 18 || rect.height > 120) return false;
+  const children = Array.from(element.children).filter((child): child is HTMLElement => child instanceof HTMLElement && isVisibleElement(child));
+  const controls = children.filter((child) => matchesSelector(child, "button,[role='button'],select,voice-input-toggle"));
+  return controls.length >= 1 || children.length >= 2;
+}
+
+function insertLauncherShell(shell: HTMLElement, slot: ToolbarSlot) {
+  const parent = slot.refElement.parentNode;
+  if (!parent) return;
+  const beforeNode = slot.insertPosition === "before" ? slot.refElement : slot.refElement.nextSibling;
+  parent.insertBefore(shell, beforeNode);
+  shell.dataset.platform = detectPlatform();
+  shell.dataset.toolbarHost = location.hostname.toLowerCase();
+  if (slot.toolbar instanceof HTMLElement) slot.toolbar.dataset.ctxToolbar = "true";
+}
+
+function syncLauncherMetrics(shell: HTMLElement, button: HTMLButtonElement, refElement: HTMLElement) {
+  const refStyle = window.getComputedStyle(refElement);
+  const refRect = refElement.getBoundingClientRect();
+  const rawSize = parseFloat(refStyle.height) || refRect.height || defaultLauncherSize;
+  const size = Math.round(clampNumber(rawSize, 24, 38));
+  shell.style.setProperty("--ctx-toolbar-button-size", `${size}px`);
+  shell.style.setProperty("--ctx-toolbar-button-radius", refStyle.borderRadius && refStyle.borderRadius !== "0px" ? refStyle.borderRadius : "999px");
+  button.style.height = `${size}px`;
+}
+
+function cleanupLegacyLaunchers() {
+  document.querySelectorAll<HTMLElement>(LEGACY_LAUNCHER_SELECTOR).forEach((element) => element.remove());
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`#${CTX_BUTTON_ID}`));
+  buttons.slice(1).forEach((button) => button.closest(`#${CTX_SHELL_ID}`)?.remove() ?? button.remove());
+}
+
+function queryVisibleElements(selector: string, root: Document | HTMLElement = document) {
+  try {
+    return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(isVisibleElement);
+  } catch {
+    return [];
+  }
+}
+
+function matchesSelector(element: HTMLElement, selector: string) {
+  try {
+    return element.matches(selector);
+  } catch {
+    return false;
+  }
+}
+
+function isInsideCtxLauncher(element: HTMLElement) {
+  return Boolean(element.closest(`#${CTX_SHELL_ID}`) || element.id === CTX_BUTTON_ID);
+}
+
+function isVisibleElement(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+  return style.visibility !== "hidden" && style.display !== "none" && isVisibleRect(rect);
 }
 
 function isVisibleRect(rect: DOMRect) {
   return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
 }
 
-function findActionAnchor(composer: DOMRect, platform: Platform) {
-  const controls = findComposerControls(composer);
-  const actionControls = findBottomActionControls(controls, composer, platform);
-  const anchorControls = actionControls.length ? actionControls : controls;
-  const left = findNativeActionSlot(anchorControls, composer, platform);
-  const centerY = anchorControls.length ? medianControlCenterY(anchorControls) : composer.bottom - Math.min(30, composer.height / 2);
-  const top = clamp(centerY - launcherSize / 2, composer.top + 6, composer.bottom - launcherSize - 6);
-  return { left, top };
-}
-
-function findComposerControls(composer: DOMRect) {
-  const controls = Array.from(document.querySelectorAll<HTMLElement>("button,[role='button'],select"))
-    .map((element) => ({
-      element,
-      rect: element.getBoundingClientRect(),
-      label: controlLabel(element)
-    }))
-    .filter(({ rect }) => {
-      const centerX = horizontalCenter(rect);
-      const centerY = verticalCenter(rect);
-      return (
-        isVisibleRect(rect) &&
-        rect.width >= 18 &&
-        rect.height >= 18 &&
-        rect.width <= 180 &&
-        rect.height <= 72 &&
-        centerX >= composer.left &&
-        centerX <= composer.right &&
-        centerY >= composer.top &&
-        centerY <= composer.bottom
-      );
-    })
-    .sort((a, b) => a.rect.left - b.rect.left);
-
-  return controls;
-}
-
-type ControlCandidate = ReturnType<typeof findComposerControls>[number];
-
-function findBottomActionControls(controls: ControlCandidate[], composer: DOMRect, platform: Platform) {
-  const threshold = composer.left + composer.width * rightControlThreshold(platform);
-  const actionControls = controls.filter((control) => {
-    const centerX = horizontalCenter(control.rect);
-    return centerX >= threshold || isVoiceControl(control) || isModelControl(control);
-  });
-  if (!actionControls.length) return [];
-
-  const rowFloor = composer.top + composer.height * bottomRowThreshold(platform);
-  const maxCenterY = Math.max(...actionControls.map((control) => verticalCenter(control.rect)));
-  const tolerance = bottomRowTolerance(platform);
-  return actionControls
-    .filter((control) => {
-      const centerY = verticalCenter(control.rect);
-      return centerY >= rowFloor && centerY >= maxCenterY - tolerance;
-    })
-    .sort((a, b) => a.rect.left - b.rect.left);
-}
-
-function findNativeActionSlot(controls: ControlCandidate[], composer: DOMRect, platform: Platform) {
-  const bounds = {
-    left: composer.left + composerPadding(platform),
-    right: composer.right - composerPadding(platform)
-  };
-  if (!controls.length) return clamp(composer.right - fallbackInsetForPlatform(platform), bounds.left, bounds.right - launcherSize);
-
-  const sorted = controls
-    .filter((control) => {
-      const centerX = horizontalCenter(control.rect);
-      return centerX >= composer.left && centerX <= composer.right;
-    })
-    .sort((a, b) => a.rect.left - b.rect.left);
-  if (!sorted.length) return clamp(composer.right - fallbackInsetForPlatform(platform), bounds.left, bounds.right - launcherSize);
-
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    const control = sorted[index];
-    const next = sorted[index + 1];
-    const rightLimit = next ? next.rect.left - launcherGap : bounds.right;
-    const left = control.rect.right + launcherGap;
-    if (left + launcherSize <= rightLimit) return clamp(left, bounds.left, bounds.right - launcherSize);
-  }
-
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    const control = sorted[index];
-    const previous = sorted[index - 1];
-    const leftLimit = previous ? previous.rect.right + launcherGap : bounds.left;
-    const left = control.rect.left - launcherGap - launcherSize;
-    if (left >= leftLimit) return clamp(left, bounds.left, bounds.right - launcherSize);
-  }
-
-  const voiceControl = findFirstVoiceControl(sorted);
-  const fallbackLeft = (voiceControl?.rect.left ?? sorted[sorted.length - 1].rect.left) - launcherGap - launcherSize;
-  return clamp(fallbackLeft, bounds.left, bounds.right - launcherSize);
-}
-
-function findFirstVoiceControl(controls: ControlCandidate[]) {
-  return controls.find((control) => isVoiceControl(control)) ?? controls.at(-1) ?? null;
-}
-
-function isVoiceControl(control: ControlCandidate) {
-  const label = control.label;
-  if (/\b(mic|microphone|voice|audio|dictate|speak|send|submit|arrow)\b/.test(label)) return true;
-  const circular = Math.abs(control.rect.width - control.rect.height) <= 14;
-  return circular && control.rect.width <= 58;
-}
-
-function isModelControl(control: ControlCandidate) {
-  return /\b(pro|flash|sonnet|opus|haiku|gpt|model|low|medium|high|thinking|reasoning|auto)\b/.test(control.label);
-}
-
-function controlLabel(element: HTMLElement) {
-  return [
-    element.getAttribute("aria-label"),
-    element.getAttribute("title"),
-    element.getAttribute("data-testid"),
-    element.textContent
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function bottomRowThreshold(platform: Platform) {
-  if (platform === "chatgpt") return 0.46;
-  if (platform === "claude") return 0.58;
-  if (platform === "gemini") return 0.62;
-  return 0.52;
-}
-
-function rightControlThreshold(platform: Platform) {
-  if (platform === "gemini") return 0.46;
-  if (platform === "claude") return 0.56;
-  return 0.52;
-}
-
-function bottomRowTolerance(platform: Platform) {
-  if (platform === "claude") return 28;
-  if (platform === "gemini") return 26;
-  return 24;
-}
-
-function composerPadding(platform: Platform) {
-  if (platform === "chatgpt") return 10;
-  if (platform === "gemini") return 12;
-  if (platform === "claude") return 14;
-  return 10;
-}
-
-function fallbackInsetForPlatform(platform: Platform) {
-  if (platform === "chatgpt") return 142;
-  if (platform === "gemini") return 142;
-  if (platform === "claude") return 150;
-  return 118;
-}
-
-function fallbackPosition() {
-  return {
-    left: Math.max(16, window.innerWidth - launcherSize - 22),
-    top: Math.max(16, window.innerHeight - launcherSize - 92)
-  };
-}
-
-function horizontalCenter(rect: DOMRect) {
-  return rect.left + rect.width / 2;
-}
-
-function verticalCenter(rect: DOMRect) {
-  return rect.top + rect.height / 2;
-}
-
-function medianControlCenterY(controls: ControlCandidate[]) {
-  const centers = controls.map((control) => verticalCenter(control.rect)).sort((a, b) => a - b);
-  return centers[Math.floor(centers.length / 2)] ?? 0;
-}
-
-function clamp(value: number, min: number, max: number) {
+function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
