@@ -445,6 +445,9 @@ function createLauncherShell(refElement: HTMLElement) {
         color-scheme: dark;
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
       }
+      #${CTX_SHELL_ID}[data-platform="deepseek"] {
+        margin: 0 7px !important;
+      }
       #${CTX_BUTTON_ID} {
         all: unset;
         position: static !important;
@@ -686,11 +689,17 @@ type ToolbarSlot = {
 };
 
 function findToolbarSlot(): ToolbarSlot | null {
+  const platform = detectPlatform();
   const config = getToolbarConfig();
+
+  if (platform === "copilot") {
+    return findSlotFromComposerControls(platform) ?? findSlotFromReferences(config) ?? findSlotFromToolbars(config);
+  }
+
   return (
     findSlotFromReferences(config) ??
     findSlotFromToolbars(config) ??
-    findSlotFromComposerControls(detectPlatform()) ??
+    findSlotFromComposerControls(platform) ??
     findSlotFromReferences(genericToolbarConfig) ??
     findSlotFromToolbars(genericToolbarConfig)
   );
@@ -776,6 +785,10 @@ function findSlotFromComposerControls(platform: Platform): ToolbarSlot | null {
 
   const refElement = chooseComposerReference(controls, composerRect);
   if (!refElement) return null;
+
+  if (platform === "copilot") {
+    return { toolbar: refElement.parentElement ?? composer, refElement, insertPosition: "before" };
+  }
 
   return normalizeToolbarSlot(refElement.parentElement ?? composer, refElement, "before");
 }
