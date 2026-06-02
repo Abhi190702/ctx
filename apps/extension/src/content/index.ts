@@ -37,8 +37,8 @@ type Capsule = {
 
 type DropMode = "smart" | "brief" | "full";
 
-const launcherSize = 34;
-const launcherGap = 9;
+const launcherSize = 28;
+const launcherGap = 8;
 let buttonHost: HTMLElement | null = null;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
@@ -191,8 +191,8 @@ function mountCtxButton() {
       :host { all: initial; color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       .wrap { position: relative; display: flex; align-items: flex-end; gap: 10px; }
       .launcher {
-        width: 34px;
-        height: 34px;
+        width: 28px;
+        height: 28px;
         display: grid;
         place-items: center;
         overflow: hidden;
@@ -200,19 +200,19 @@ function mountCtxButton() {
         border-radius: 999px;
         background: radial-gradient(circle at 35% 22%, rgba(139,245,207,.20), rgba(5,8,18,.96) 58%);
         cursor: pointer;
-        box-shadow: 0 8px 22px rgba(0,0,0,.30), 0 0 0 2px rgba(139,245,207,.07);
+        box-shadow: 0 5px 16px rgba(0,0,0,.28), 0 0 0 2px rgba(139,245,207,.06);
         transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease;
       }
       .launcher:hover {
         border-color: rgba(139,245,207,.80);
         filter: brightness(1.05);
         transform: translateY(-1px);
-        box-shadow: 0 10px 28px rgba(0,0,0,.36), 0 0 0 3px rgba(139,245,207,.10);
+        box-shadow: 0 8px 22px rgba(0,0,0,.34), 0 0 0 3px rgba(139,245,207,.09);
       }
       .launcher:focus-visible, .menu button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
       .launcher img {
-        width: 24px;
-        height: 24px;
+        width: 19px;
+        height: 19px;
         display: block;
         object-fit: contain;
       }
@@ -226,7 +226,7 @@ function mountCtxButton() {
       .menu {
         position: absolute;
         right: 0;
-        bottom: 42px;
+        bottom: 36px;
         width: 216px;
         display: none;
         overflow: hidden;
@@ -239,11 +239,11 @@ function mountCtxButton() {
       .menu[data-open="true"] { display: block; }
       :host([data-platform="claude"]) .menu {
         bottom: auto;
-        top: 42px;
+        top: 36px;
       }
       :host([data-platform="claude"]) .toast {
         bottom: auto;
-        top: 42px;
+        top: 36px;
       }
       .menu button {
         width: 100%;
@@ -288,7 +288,7 @@ function mountCtxButton() {
       .toast {
         position: absolute;
         right: 0;
-        bottom: 42px;
+        bottom: 36px;
         min-width: 210px;
         max-width: 300px;
         display: none;
@@ -496,24 +496,16 @@ function isVisibleRect(rect: DOMRect) {
 }
 
 function findActionAnchor(composer: DOMRect, platform: Platform) {
-  const controls = findComposerControls(composer, platform);
-  const voiceControl = findFirstVoiceControl(controls);
-  const modelControl = voiceControl ? findModelControlBefore(controls, voiceControl.rect) : null;
-  const firstRightControl = voiceControl?.rect ?? controls[0]?.rect;
-  const centerY = firstRightControl ? verticalCenter(firstRightControl) : composer.bottom - Math.min(30, composer.height / 2);
-  const centerX =
-    modelControl && voiceControl
-      ? centerBetweenModelAndVoice(modelControl.rect, voiceControl.rect)
-      : firstRightControl
-        ? firstRightControl.left - launcherGap - launcherSize / 2
-        : composer.right - fallbackInsetForPlatform(platform);
-  const left = clamp(centerX - launcherSize / 2, composer.left + 12, composer.right - launcherSize - 12);
-  const top = clamp(centerY - launcherSize / 2, composer.top + 8, composer.bottom - launcherSize - 8);
+  const controls = findComposerControls(composer);
+  const actionControls = findBottomActionControls(controls, composer, platform);
+  const anchorControls = actionControls.length ? actionControls : controls;
+  const left = findNativeActionSlot(anchorControls, composer, platform);
+  const centerY = anchorControls.length ? medianControlCenterY(anchorControls) : composer.bottom - Math.min(30, composer.height / 2);
+  const top = clamp(centerY - launcherSize / 2, composer.top + 6, composer.bottom - launcherSize - 6);
   return { left, top };
 }
 
-function findComposerControls(composer: DOMRect, platform: Platform) {
-  const threshold = composer.left + composer.width * rightControlThreshold(platform);
+function findComposerControls(composer: DOMRect) {
   const controls = Array.from(document.querySelectorAll<HTMLElement>("button,[role='button'],select"))
     .map((element) => ({
       element,
@@ -523,17 +515,15 @@ function findComposerControls(composer: DOMRect, platform: Platform) {
     .filter(({ rect }) => {
       const centerX = horizontalCenter(rect);
       const centerY = verticalCenter(rect);
-      const bottomRowTop = composer.top + composer.height * bottomRowThreshold(platform);
       return (
         isVisibleRect(rect) &&
         rect.width >= 18 &&
         rect.height >= 18 &&
-        rect.width <= 96 &&
-        rect.height <= 96 &&
-        centerX >= threshold &&
+        rect.width <= 180 &&
+        rect.height <= 72 &&
         centerX >= composer.left &&
         centerX <= composer.right &&
-        centerY >= bottomRowTop &&
+        centerY >= composer.top &&
         centerY <= composer.bottom
       );
     })
@@ -544,24 +534,63 @@ function findComposerControls(composer: DOMRect, platform: Platform) {
 
 type ControlCandidate = ReturnType<typeof findComposerControls>[number];
 
+function findBottomActionControls(controls: ControlCandidate[], composer: DOMRect, platform: Platform) {
+  const threshold = composer.left + composer.width * rightControlThreshold(platform);
+  const actionControls = controls.filter((control) => {
+    const centerX = horizontalCenter(control.rect);
+    return centerX >= threshold || isVoiceControl(control) || isModelControl(control);
+  });
+  if (!actionControls.length) return [];
+
+  const rowFloor = composer.top + composer.height * bottomRowThreshold(platform);
+  const maxCenterY = Math.max(...actionControls.map((control) => verticalCenter(control.rect)));
+  const tolerance = bottomRowTolerance(platform);
+  return actionControls
+    .filter((control) => {
+      const centerY = verticalCenter(control.rect);
+      return centerY >= rowFloor && centerY >= maxCenterY - tolerance;
+    })
+    .sort((a, b) => a.rect.left - b.rect.left);
+}
+
+function findNativeActionSlot(controls: ControlCandidate[], composer: DOMRect, platform: Platform) {
+  const bounds = {
+    left: composer.left + composerPadding(platform),
+    right: composer.right - composerPadding(platform)
+  };
+  if (!controls.length) return clamp(composer.right - fallbackInsetForPlatform(platform), bounds.left, bounds.right - launcherSize);
+
+  const sorted = controls
+    .filter((control) => {
+      const centerX = horizontalCenter(control.rect);
+      return centerX >= composer.left && centerX <= composer.right;
+    })
+    .sort((a, b) => a.rect.left - b.rect.left);
+  if (!sorted.length) return clamp(composer.right - fallbackInsetForPlatform(platform), bounds.left, bounds.right - launcherSize);
+
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const control = sorted[index];
+    const next = sorted[index + 1];
+    const rightLimit = next ? next.rect.left - launcherGap : bounds.right;
+    const left = control.rect.right + launcherGap;
+    if (left + launcherSize <= rightLimit) return clamp(left, bounds.left, bounds.right - launcherSize);
+  }
+
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const control = sorted[index];
+    const previous = sorted[index - 1];
+    const leftLimit = previous ? previous.rect.right + launcherGap : bounds.left;
+    const left = control.rect.left - launcherGap - launcherSize;
+    if (left >= leftLimit) return clamp(left, bounds.left, bounds.right - launcherSize);
+  }
+
+  const voiceControl = findFirstVoiceControl(sorted);
+  const fallbackLeft = (voiceControl?.rect.left ?? sorted[sorted.length - 1].rect.left) - launcherGap - launcherSize;
+  return clamp(fallbackLeft, bounds.left, bounds.right - launcherSize);
+}
+
 function findFirstVoiceControl(controls: ControlCandidate[]) {
   return controls.find((control) => isVoiceControl(control)) ?? controls.at(-1) ?? null;
-}
-
-function findModelControlBefore(controls: ControlCandidate[], voiceRect: DOMRect) {
-  const beforeVoice = controls.filter((control) => control.rect.right <= voiceRect.left + 6);
-  for (let index = beforeVoice.length - 1; index >= 0; index -= 1) {
-    const control = beforeVoice[index];
-    if (isModelControl(control)) return control;
-  }
-  return beforeVoice.at(-1) ?? null;
-}
-
-function centerBetweenModelAndVoice(modelRect: DOMRect, voiceRect: DOMRect) {
-  const gapCenter = (modelRect.right + voiceRect.left) / 2;
-  const minimumGap = launcherSize + launcherGap * 2;
-  if (voiceRect.left - modelRect.right >= minimumGap) return gapCenter;
-  return voiceRect.left - launcherGap - launcherSize / 2;
 }
 
 function isVoiceControl(control: ControlCandidate) {
@@ -590,16 +619,29 @@ function controlLabel(element: HTMLElement) {
 }
 
 function bottomRowThreshold(platform: Platform) {
-  if (platform === "chatgpt") return 0.32;
-  if (platform === "claude") return 0.50;
-  if (platform === "gemini") return 0.58;
-  return 0.42;
+  if (platform === "chatgpt") return 0.46;
+  if (platform === "claude") return 0.58;
+  if (platform === "gemini") return 0.62;
+  return 0.52;
 }
 
 function rightControlThreshold(platform: Platform) {
   if (platform === "gemini") return 0.46;
   if (platform === "claude") return 0.56;
   return 0.52;
+}
+
+function bottomRowTolerance(platform: Platform) {
+  if (platform === "claude") return 28;
+  if (platform === "gemini") return 26;
+  return 24;
+}
+
+function composerPadding(platform: Platform) {
+  if (platform === "chatgpt") return 10;
+  if (platform === "gemini") return 12;
+  if (platform === "claude") return 14;
+  return 10;
 }
 
 function fallbackInsetForPlatform(platform: Platform) {
@@ -622,6 +664,11 @@ function horizontalCenter(rect: DOMRect) {
 
 function verticalCenter(rect: DOMRect) {
   return rect.top + rect.height / 2;
+}
+
+function medianControlCenterY(controls: ControlCandidate[]) {
+  const centers = controls.map((control) => verticalCenter(control.rect)).sort((a, b) => a - b);
+  return centers[Math.floor(centers.length / 2)] ?? 0;
 }
 
 function clamp(value: number, min: number, max: number) {
