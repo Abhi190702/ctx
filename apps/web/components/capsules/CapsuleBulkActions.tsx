@@ -45,8 +45,8 @@ export function CapsuleBulkActions({ capsules }: { capsules: CapsuleRow[] }) {
     <Card className="mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Bulk Cleanup</h2>
-          <p className="mt-1 text-sm text-slate-400">Select visible capsules, then archive, restore, or delete them together.</p>
+          <h2 className="text-lg font-semibold text-foreground">Bulk Cleanup</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Select visible capsules, then archive, restore, or delete them together.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => void run("archive")} disabled={!selected.length || Boolean(busy)}>
@@ -63,9 +63,9 @@ export function CapsuleBulkActions({ capsules }: { capsules: CapsuleRow[] }) {
           </Button>
         </div>
       </div>
-      <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
+      <div className="mt-4 max-h-80 overflow-auto rounded-xl border border-line">
         {visibleCapsules.map((capsule) => (
-          <label key={capsule.id} className="flex cursor-pointer items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 hover:bg-white/[0.03]">
+          <label key={capsule.id} className="flex cursor-pointer items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 hover:bg-ink">
             <input
               type="checkbox"
               checked={selected.includes(capsule.id)}
@@ -73,14 +73,14 @@ export function CapsuleBulkActions({ capsules }: { capsules: CapsuleRow[] }) {
               className="h-4 w-4 accent-mint"
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-white">{capsule.title}</span>
-              <span className="text-xs text-slate-500">{capsule.project?.name || "No project"} · {capsule.status || "active"}</span>
+              <span className="block truncate text-sm font-medium text-foreground">{capsule.title}</span>
+              <span className="text-xs text-muted">{capsule.project?.name || "No project"} / {capsule.status || "active"}</span>
             </span>
           </label>
         ))}
       </div>
       {capsules.length > visibleCapsules.length ? (
-        <p className="mt-3 text-xs text-slate-500">Showing first {visibleCapsules.length} filtered capsules. Narrow the search to clean up a smaller set.</p>
+        <p className="mt-3 text-xs text-muted">Showing first {visibleCapsules.length} filtered capsules. Narrow the search to clean up a smaller set.</p>
       ) : null}
     </Card>
   );

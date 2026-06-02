@@ -22,7 +22,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
       <div className="space-y-8">
         <ProjectMemoryWorkspace memory={memory} />
         <section>
-          <h2 className="mb-4 text-xl font-semibold text-white">Project Capsules</h2>
+          <h2 className="mb-4 text-xl font-semibold text-foreground">Project Capsules</h2>
           <CapsuleList capsules={memory.activeCapsules} />
         </section>
       </div>

@@ -28,7 +28,7 @@ export function ProjectForm() {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-line bg-panel p-4 md:grid-cols-[1fr_1fr_auto]">
+    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-line bg-panel p-4 md:grid-cols-[1fr_1fr_auto]">
       <label className="sr-only" htmlFor="project-name">
         Project Name
       </label>

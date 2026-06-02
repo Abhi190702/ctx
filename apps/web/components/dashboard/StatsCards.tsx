@@ -1,4 +1,4 @@
-import { Activity, Boxes, Cpu, Network } from "lucide-react";
+import { Activity, Boxes, Github, Network } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export function StatsCards({ stats }: { stats: any }) {
@@ -6,7 +6,7 @@ export function StatsCards({ stats }: { stats: any }) {
     { label: "Total Capsules", value: stats.totalCapsules, icon: Boxes, tone: "text-mint" },
     { label: "Projects", value: stats.totalProjects, icon: Network, tone: "text-sky" },
     { label: "Injections", value: stats.totalInjections, icon: Activity, tone: "text-amber" },
-    { label: "Platforms", value: stats.supportedPlatforms, icon: Cpu, tone: "text-rose" }
+    { label: "GitHub Captures", value: stats.githubCaptures ?? 0, icon: Github, tone: "text-rose" }
   ];
 
   return (
@@ -17,8 +17,8 @@ export function StatsCards({ stats }: { stats: any }) {
           <Card key={card.label} className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-400">{card.label}</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{card.value}</p>
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+                <p className="mt-2 text-3xl font-semibold text-foreground">{card.value}</p>
               </div>
               <Icon aria-hidden="true" className={`h-6 w-6 ${card.tone}`} />
             </div>

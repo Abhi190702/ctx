@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 
 const claudeConfig = `{
   "mcpServers": {
@@ -34,8 +35,11 @@ export function MCPConfigSnippet() {
 function Snippet({ title, value }: { title: string; value: string }) {
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-      <pre className="mt-4 overflow-auto rounded-lg border border-line bg-ink p-4 text-sm leading-6 text-mint">{value}</pre>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <CopyButton value={value} />
+      </div>
+      <pre className="mt-4 overflow-auto rounded-xl border border-line bg-ink p-4 text-sm leading-6 text-foreground">{value}</pre>
     </Card>
   );
 }

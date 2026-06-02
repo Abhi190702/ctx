@@ -49,15 +49,15 @@ export function OnboardingChecklist({ stats, githubConfigured }: OnboardingCheck
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Readiness</h2>
-          <p className="mt-1 text-sm text-slate-400">{complete} of {items.length} ready</p>
+          <h2 className="text-lg font-semibold text-foreground">Readiness</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{complete} of {items.length} ready</p>
         </div>
-        <span className="rounded-lg border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-semibold text-mint">
+        <span className="rounded-xl border border-mint/30 bg-mint/10 px-2.5 py-1 text-xs font-semibold text-mint">
           Setup
         </span>
       </div>
 
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-ink">
         <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${(complete / items.length) * 100}%` }} />
       </div>
 
@@ -69,17 +69,17 @@ export function OnboardingChecklist({ stats, githubConfigured }: OnboardingCheck
             <Link
               key={item.label}
               href={item.href}
-              className="group flex gap-3 rounded-lg border border-line bg-white/[0.03] p-3 hover:border-mint/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              className="group flex gap-3 rounded-xl border border-line bg-ink p-3 hover:border-mint/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
             >
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-panel">
-                <Icon aria-hidden="true" className="h-4 w-4 text-slate-300 group-hover:text-mint" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-line bg-panel">
+                <Icon aria-hidden="true" className="h-4 w-4 text-muted-foreground group-hover:text-mint" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">{item.label}</p>
-                  <StateIcon aria-hidden="true" className={item.done ? "h-4 w-4 shrink-0 text-mint" : "h-4 w-4 shrink-0 text-slate-600"} />
+                  <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                  <StateIcon aria-hidden="true" className={item.done ? "h-4 w-4 shrink-0 text-mint" : "h-4 w-4 shrink-0 text-muted"} />
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p>
               </div>
             </Link>
           );

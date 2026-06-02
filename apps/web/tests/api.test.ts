@@ -3,6 +3,7 @@ import { getGitHubTokenStatus } from "../lib/github";
 import { inspectBackupPayload, buildBackupEnvelope } from "../lib/backup";
 import { enrichGitHubCapsuleInput } from "../lib/github-deep-context";
 import { buildProjectMemory } from "../lib/project-memory";
+import { createEncryptedShareBundle, decryptShareBundle, inspectShareBundle } from "../lib/share-bundle";
 
 describe("api helpers", () => {
   it("reports github token status shape", () => {
@@ -66,5 +67,21 @@ describe("api helpers", () => {
     expect(memory.agentBrief).toContain("Use one-click capture");
     expect(memory.health.openQuestionCount).toBe(1);
     expect(memory.tasks.active).toHaveLength(1);
+  });
+
+  it("encrypts and decrypts team share bundles", () => {
+    const payload = { capsules: [{ title: "Team memory" }], projects: [] };
+    const bundle = createEncryptedShareBundle({
+      payload,
+      passphrase: "share-passphrase",
+      teamName: "CTX Team"
+    });
+
+    expect(inspectShareBundle(bundle)).toMatchObject({
+      teamName: "CTX Team",
+      encrypted: true,
+      checksumValid: true
+    });
+    expect(decryptShareBundle(bundle, "share-passphrase")).toEqual(payload);
   });
 });

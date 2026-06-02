@@ -68,7 +68,7 @@ export function BackupActions() {
         <Download aria-hidden="true" className="h-4 w-4" />
         Download Backup
       </Button>
-      {message ? <span className="text-xs text-slate-400" aria-live="polite">{message}</span> : null}
+      {message ? <span className="text-xs text-muted-foreground" aria-live="polite">{message}</span> : null}
     </div>
   );
 }

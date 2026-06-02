@@ -2,7 +2,7 @@ import { safeJsonParseArray } from "@ctx/core";
 import { prisma } from "./db";
 
 export async function getStats() {
-  const [capsules, projects, activities, totalInjections] = await Promise.all([
+  const [capsules, projects, activities, totalInjections, githubCaptures] = await Promise.all([
     prisma.capsule.findMany({
       where: { status: "active" },
       include: { project: true },
@@ -10,7 +10,8 @@ export async function getStats() {
     }),
     prisma.project.findMany({ include: { capsules: true } }),
     prisma.activity.findMany({ orderBy: { createdAt: "desc" }, take: 25 }),
-    prisma.activity.count({ where: { type: "capsule_injected" } })
+    prisma.activity.count({ where: { type: "capsule_injected" } }),
+    prisma.gitHubCapture.count()
   ]);
 
   const platformDistribution = capsules.reduce<Record<string, number>>((acc, capsule) => {
@@ -29,6 +30,7 @@ export async function getStats() {
     totalCapsules: capsules.length,
     totalProjects: projects.length,
     totalInjections,
+    githubCaptures,
     supportedPlatforms: 8,
     highTokenCapsules: highToken,
     capsulesMissingSummary: missingSummary,

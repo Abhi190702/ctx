@@ -17,8 +17,9 @@ CTX is a local-first app for turning chats, GitHub context, notes, and project d
 - Local deterministic extraction for title, summary, tags, project hints, goals, decisions, constraints, open questions, next steps, importance, and markdown notes.
 - Browser extension for ChatGPT, Claude, Gemini, Perplexity, and GitHub with Generate, Drop, Open CTX, health checks, and copy fallback.
 - GitHub capture for repositories, issues, pull requests, README context, commits, and review-oriented handoff capsules when `GITHUB_TOKEN` is configured.
-- MCP server tools for agents that need to create, search, update, export, and retrieve project memory.
+- MCP server tools, resources, and prompts for agents that need to create, search, update, export, retrieve project memory, and prepare task handoffs.
 - Local SQLite storage, secret redaction, version snapshots, latest-version diff, activity history, and backup/restore.
+- Encrypted team share bundles for local-first memory exchange between CTX workspaces.
 
 ## Requirements
 
@@ -154,11 +155,25 @@ CTX_API_URL=http://localhost:3000/api pnpm mcp:dev
 
 Example client configs are in `examples/mcp`.
 
+CTX exposes MCP tools, resources, and prompts. Useful agent-facing entries include `ctx_agent_brief`, `ctx_semantic_search_capsules`, `ctx://capsules/recent`, `ctx://projects/{projectName}/memory`, `ctx_project_handoff`, and `ctx_retrieve_task_memory`.
+
 ## Backup And Restore
 
 Use the dashboard backup controls on the Capsules page to export all capsules. The export is a portable JSON bundle that can be restored through the same UI.
 
 Keep backups somewhere outside the repo if the data matters.
+
+For team handoff, use Settings to create an encrypted share bundle. Share the bundle file and passphrase separately.
+
+## Release Artifacts
+
+Stage a local release folder:
+
+```bash
+pnpm release
+```
+
+The generated `release/ctx-v<version>` folder includes docs, examples, Docker files, unpacked extension assets, checksums, and install notes.
 
 ## Project Structure
 
@@ -187,6 +202,7 @@ pnpm db:reset     # reset local SQLite database
 pnpm web:dev      # run only the web app in development
 pnpm mcp:dev      # run the MCP server
 pnpm extension:dev # watch-build the extension
+pnpm release       # stage docs, checksums, and extension release assets
 ```
 
 ## Verification Before Release

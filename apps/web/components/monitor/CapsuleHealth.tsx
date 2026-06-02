@@ -11,12 +11,12 @@ export function CapsuleHealth({ stats }: { stats: any }) {
 
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-white">Capsule Health</h2>
+      <h2 className="text-lg font-semibold text-foreground">Capsule Health</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {checks.map((check) => (
-          <div key={check.label} className="flex items-center justify-between rounded-lg border border-line bg-white/[0.03] p-3">
-            <span className="text-sm text-slate-300">{check.label}</span>
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+          <div key={check.label} className="flex items-center justify-between rounded-xl border border-line bg-ink p-3">
+            <span className="text-sm text-muted-foreground">{check.label}</span>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               {check.value > 0 ? (
                 <AlertTriangle aria-hidden="true" className="h-4 w-4 text-amber" />
               ) : (

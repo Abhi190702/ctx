@@ -12,7 +12,7 @@ const actions = [
 export function QuickActions() {
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-white">Quick Actions</h2>
+      <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {actions.map((action) => {
           const Icon = action.icon;
@@ -20,7 +20,7 @@ export function QuickActions() {
             <Link
               key={action.href}
               href={action.href}
-              className="flex items-center gap-3 rounded-lg border border-line bg-white/[0.03] p-3 text-sm text-slate-200 hover:border-mint/40 hover:text-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              className="flex items-center gap-3 rounded-xl border border-line bg-ink p-3 text-sm text-foreground hover:border-mint/40 hover:text-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
             >
               <Icon aria-hidden="true" className="h-4 w-4" />
               {action.label}

@@ -39,8 +39,8 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Create Capsule from GitHub</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">
+          <h2 className="text-lg font-semibold text-foreground">Create Capsule from GitHub</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             Turn GitHub issues, pull requests, READMEs, comments, reviews, CI checks, and repository metadata into reusable AI memory.
           </p>
         </div>
@@ -55,7 +55,7 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="github-type" className="mb-2 block text-sm font-medium text-slate-200">
+            <label htmlFor="github-type" className="mb-2 block text-sm font-medium text-foreground">
               Capture Type
             </label>
             <select
@@ -63,7 +63,7 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
               name="type"
               value={type}
               onChange={(event) => setType(event.target.value)}
-              className="h-10 w-full rounded-lg border border-line bg-ink px-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              className="h-10 w-full rounded-xl border border-line bg-ink px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
             >
               <option value="issue">Issue</option>
               <option value="pull_request">Pull Request</option>
@@ -79,7 +79,7 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
           {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Github aria-hidden="true" className="h-4 w-4" />}
           {loading ? "Capturing..." : "Create Capsule from GitHub"}
         </Button>
-        {message ? <p className="text-sm text-slate-300" aria-live="polite">{message}</p> : null}
+        {message ? <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p> : null}
       </form>
     </Card>
   );
@@ -88,7 +88,7 @@ export function GitHubCaptureCard({ tokenConfigured }: { tokenConfigured: boolea
 function Field({ label, name, ...props }: { label: string; name: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>
-      <label htmlFor={`github-${name}`} className="mb-2 block text-sm font-medium text-slate-200">
+      <label htmlFor={`github-${name}`} className="mb-2 block text-sm font-medium text-foreground">
         {label}
       </label>
       <Input id={`github-${name}`} name={name} required autoComplete="off" {...props} />

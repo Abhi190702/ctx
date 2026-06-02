@@ -49,7 +49,7 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
           </div>
         }
       />
-      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-slate-400">
+      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>Platform: {capsule.platform || "manual"}</span>
         <span>Status: {capsule.status || "active"}</span>
         <span>Tokens: {capsule.tokenEstimate}</span>
@@ -88,9 +88,9 @@ export default async function CapsuleDetailPage({ params }: { params: { id: stri
             </CardHeader>
             <div className="space-y-3">
               {capsule.activities.map((activity) => (
-                <div key={activity.id} className="rounded-lg border border-line bg-white/[0.03] p-3">
-                  <p className="text-sm text-slate-200">{activity.message}</p>
-                  <p className="mt-1 text-xs text-slate-500">{formatDateTime(activity.createdAt)}</p>
+                <div key={activity.id} className="rounded-xl border border-line bg-ink p-3">
+                  <p className="text-sm text-foreground">{activity.message}</p>
+                  <p className="mt-1 text-xs text-muted">{formatDateTime(activity.createdAt)}</p>
                 </div>
               ))}
             </div>

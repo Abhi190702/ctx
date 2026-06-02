@@ -131,11 +131,11 @@ export function QuickCapsuleCreator() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-6">
-        <section className="rounded-lg border border-mint/30 bg-mint/[0.04] p-5 shadow-glow">
+        <section className="rounded-xl border border-mint/30 bg-mint/[0.04] p-5 shadow-glow">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-white">Fast Capsule</h2>
-              <p className="mt-1 text-sm text-slate-400">Paste once. CTX prepares the memory.</p>
+              <h2 className="text-xl font-semibold text-foreground">Fast Capsule</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Paste once. CTX prepares the memory.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="secondary" onClick={pasteClipboard}>
@@ -180,7 +180,7 @@ export function QuickCapsuleCreator() {
           </div>
 
           {message ? (
-            <p className="mt-4 rounded-lg border border-rose/40 bg-rose/10 p-3 text-sm text-rose" aria-live="polite">
+            <p className="mt-4 rounded-xl border border-rose/40 bg-rose/10 p-3 text-sm text-rose" aria-live="polite">
               {message}
             </p>
           ) : null}
@@ -194,12 +194,12 @@ export function QuickCapsuleCreator() {
               <Sparkles aria-hidden="true" className="h-4 w-4" />
               Quick Save
             </Button>
-            <span className="text-xs text-slate-500">{text.trim() ? `${text.trim().length.toLocaleString()} characters ready` : "Waiting for context"}</span>
+            <span className="text-xs text-muted">{text.trim() ? `${text.trim().length.toLocaleString()} characters ready` : "Waiting for context"}</span>
           </div>
         </section>
 
-        <details className="rounded-lg border border-line bg-panel p-5">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-200">
+        <details className="rounded-xl border border-line bg-panel p-5">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-foreground">
             <Settings2 aria-hidden="true" className="h-4 w-4" />
             Advanced manual editor
           </summary>
@@ -209,10 +209,10 @@ export function QuickCapsuleCreator() {
         </details>
       </div>
 
-      <aside className="rounded-lg border border-line bg-panel p-5 shadow-glow">
+      <aside className="rounded-xl border border-line bg-panel p-5 shadow-glow">
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-white">Capture Review</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">Review the generated memory before saving it.</p>
+          <h2 className="text-lg font-semibold text-foreground">Capture Review</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">Review the generated memory before saving it.</p>
         </div>
         {draft ? (
           <div className="space-y-4">
@@ -228,7 +228,7 @@ export function QuickCapsuleCreator() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-line bg-white/[0.03] p-5 text-sm leading-6 text-slate-400">
+          <div className="rounded-xl border border-dashed border-line bg-ink p-5 text-sm leading-6 text-muted-foreground">
             Generate a preview to inspect the capsule before it becomes memory.
           </div>
         )}
@@ -262,14 +262,14 @@ function QualityChecklist({ draft }: { draft: DraftCapsule }) {
   const score = draft.review?.qualityScore ?? Math.round((checks.filter((check) => check.ok).length / checks.length) * 100);
 
   return (
-    <div className="rounded-lg border border-line bg-white/[0.03] p-3">
+    <div className="rounded-xl border border-line bg-ink p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-white">Capsule Quality</span>
+        <span className="text-sm font-semibold text-foreground">Capsule Quality</span>
         <span className="text-sm font-semibold text-mint">{score}%</span>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {checks.map((check) => (
-          <span key={check.label} className={check.ok ? "text-xs font-medium text-mint" : "text-xs font-medium text-slate-500"}>
+          <span key={check.label} className={check.ok ? "text-xs font-medium text-mint" : "text-xs font-medium text-muted"}>
             {check.ok ? "Ready" : "Needs"}: {check.label}
           </span>
         ))}
@@ -291,13 +291,13 @@ function QualityChecklist({ draft }: { draft: DraftCapsule }) {
       )}
       {draft.review?.duplicateCandidates.length ? (
         <div className="mt-4 border-t border-line pt-3">
-          <p className="text-xs font-semibold text-slate-300">Possible duplicates</p>
+          <p className="text-xs font-semibold text-muted-foreground">Possible duplicates</p>
           <div className="mt-2 space-y-2">
             {draft.review.duplicateCandidates.map((candidate) => (
               <Link
                 key={candidate.id}
                 href={`/capsules/${candidate.id}`}
-                className="block rounded-lg border border-amber/30 bg-amber/10 p-2 text-xs text-amber hover:border-amber/60"
+                className="block rounded-xl border border-amber/30 bg-amber/10 p-2 text-xs text-amber hover:border-amber/60"
               >
                 <span className="font-semibold">{candidate.title}</span>
                 <span className="mt-1 block text-amber/80">{candidate.score}% match: {candidate.reason}</span>
@@ -313,7 +313,7 @@ function QualityChecklist({ draft }: { draft: DraftCapsule }) {
 function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-200">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-foreground">{label}</span>
       <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
@@ -332,7 +332,7 @@ function LabeledTextarea({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-200">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-foreground">{label}</span>
       <Textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} />
     </label>
   );

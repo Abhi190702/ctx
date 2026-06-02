@@ -5,16 +5,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#090b10",
-        panel: "#10141d",
-        line: "#232a36",
-        mint: "#8bf5cf",
-        sky: "#8fc7ff",
-        amber: "#ffd166",
-        rose: "#ff8aa1"
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: "var(--card)",
+        muted: "var(--muted)",
+        "muted-foreground": "var(--muted-foreground)",
+        ink: "#F3F3EF",
+        panel: "#FFFFFF",
+        line: "#E7E5DF",
+        strongline: "#D8D6CE",
+        mint: "#2A9D8F",
+        "mint-dark": "#1F766D",
+        "mint-soft": "#E7F5F2",
+        sky: "#4F7FBF",
+        amber: "#B7791F",
+        rose: "#B42318"
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(139,245,207,0.12), 0 18px 70px rgba(0,0,0,0.35)"
+        glow: "0 1px 2px rgba(24,24,23,0.04), 0 18px 48px rgba(24,24,23,0.08)"
       }
     }
   },

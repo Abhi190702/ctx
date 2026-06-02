@@ -12,7 +12,7 @@ type DiffLine = {
 export function CapsuleDiff({ versions }: { versions: CapsuleVersion[] }) {
   const [current, previous] = versions;
   if (!current || !previous) {
-    return <p className="text-sm leading-6 text-slate-400">The first saved version is the baseline. Future edits will show a visual diff here.</p>;
+    return <p className="text-sm leading-6 text-muted-foreground">The first saved version is the baseline. Future edits will show a visual diff here.</p>;
   }
 
   const currentLines = snapshotLines(current.snapshot);
@@ -23,13 +23,13 @@ export function CapsuleDiff({ versions }: { versions: CapsuleVersion[] }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-mint/30 bg-mint/[0.05] p-3">
+        <div className="rounded-xl border border-mint/30 bg-mint/[0.05] p-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">Added</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{added.length}</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{added.length}</p>
         </div>
-        <div className="rounded-lg border border-rose/30 bg-rose/[0.05] p-3">
+        <div className="rounded-xl border border-rose/30 bg-rose/[0.05] p-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose">Removed</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{removed.length}</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{removed.length}</p>
         </div>
       </div>
 
@@ -39,7 +39,7 @@ export function CapsuleDiff({ versions }: { versions: CapsuleVersion[] }) {
           <DiffBlock title="Removed Lines" tone="removed" lines={removed} />
         </div>
       ) : (
-        <p className="rounded-lg border border-line bg-white/[0.03] p-3 text-sm leading-6 text-slate-400">
+        <p className="rounded-xl border border-line bg-ink p-3 text-sm leading-6 text-muted-foreground">
           No readable content changes between the latest two versions.
         </p>
       )}
@@ -51,18 +51,18 @@ function DiffBlock({ title, tone, lines }: { title: string; tone: "added" | "rem
   const mark = tone === "added" ? "+" : "-";
   const color = tone === "added" ? "text-mint" : "text-rose";
   return (
-    <div className="rounded-lg border border-line bg-white/[0.03] p-3">
-      <h3 className="text-sm font-semibold text-white">{title}</h3>
+    <div className="rounded-xl border border-line bg-ink p-3">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 max-h-72 space-y-2 overflow-auto pr-1">
         {lines.length ? (
           lines.slice(0, 20).map((line) => (
-            <p key={line.key} className="grid grid-cols-[18px_1fr] gap-2 text-sm leading-6 text-slate-300">
+            <p key={line.key} className="grid grid-cols-[18px_1fr] gap-2 text-sm leading-6 text-muted-foreground">
               <span className={color}>{mark}</span>
               <span>{line.text}</span>
             </p>
           ))
         ) : (
-          <p className="text-sm text-slate-500">Nothing in this side of the diff.</p>
+          <p className="text-sm text-muted">Nothing in this side of the diff.</p>
         )}
       </div>
     </div>

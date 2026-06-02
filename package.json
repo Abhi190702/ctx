@@ -20,7 +20,8 @@
     "web:dev": "pnpm db:push && pnpm --filter @ctx/web dev",
     "web:start": "pnpm --filter @ctx/web start",
     "mcp:dev": "pnpm --filter @ctx/mcp-server dev",
-    "extension:dev": "pnpm --filter @ctx/extension dev"
+    "extension:dev": "pnpm --filter @ctx/extension dev",
+    "release": "pnpm --filter @ctx/web exec tsx ../../scripts/release.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",

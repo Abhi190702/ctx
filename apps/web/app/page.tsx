@@ -1,5 +1,6 @@
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { HeroSection } from "@/components/dashboard/HeroSection";
+import { LandingSections } from "@/components/dashboard/LandingSections";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentCapsules } from "@/components/dashboard/RecentCapsules";
@@ -17,12 +18,13 @@ export default async function HomePage() {
   return (
     <PageShell>
       <HeroSection />
+      <LandingSections />
       <DashboardHeader />
       <div className="space-y-6">
         <StatsCards stats={stats} />
         <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <section>
-            <h2 className="mb-4 text-xl font-semibold text-white">Recent Capsules</h2>
+            <h2 className="mb-4 text-xl font-semibold text-foreground">Recent Capsules</h2>
             <RecentCapsules capsules={stats.recentCapsules} />
           </section>
           <aside className="space-y-6">

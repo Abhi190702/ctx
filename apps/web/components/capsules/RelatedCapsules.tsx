@@ -5,7 +5,7 @@ export function RelatedCapsules({ capsules }: { capsules: any[] }) {
 
   return (
     <section>
-      <h2 className="mb-4 text-xl font-semibold text-white">Related Memory</h2>
+      <h2 className="mb-4 text-xl font-semibold text-foreground">Related Memory</h2>
       <div className="grid gap-4 md:grid-cols-2">
         {capsules.map((capsule) => (
           <CapsuleCard key={capsule.id} capsule={capsule} />

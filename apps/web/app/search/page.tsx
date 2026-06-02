@@ -17,7 +17,7 @@ export default async function SearchPage({ searchParams }: { searchParams?: { q?
     <PageShell>
       <PageHeader title="Search" description="Search across titles, summaries, tags, markdown, and raw captured context." />
       <form action="/search" className="mb-6">
-        <label htmlFor="search-page-input" className="mb-2 block text-sm font-medium text-slate-200">
+        <label htmlFor="search-page-input" className="mb-2 block text-sm font-medium text-foreground">
           Search Capsules
         </label>
         <input
@@ -27,11 +27,11 @@ export default async function SearchPage({ searchParams }: { searchParams?: { q?
           autoComplete="off"
           defaultValue={q}
           placeholder="Try github, kubernetes, launch plan..."
-          className="h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-white placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          className="h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
         />
       </form>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {q.trim() ? `${capsules.length} result${capsules.length === 1 ? "" : "s"} for "${q.trim()}"` : "Most recent capsules"}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -39,7 +39,7 @@ export default async function SearchPage({ searchParams }: { searchParams?: { q?
             <Link
               key={suggestion}
               href={`/search?q=${encodeURIComponent(suggestion)}`}
-              className="rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-mint/40 hover:text-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              className="rounded-xl border border-line bg-ink px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-mint/40 hover:text-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
             >
               {suggestion}
             </Link>

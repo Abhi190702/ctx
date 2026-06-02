@@ -30,13 +30,12 @@ GITHUB_TOKEN="github_pat_..."
 
 ## Current Limits
 
-- Comments and review threads are not captured yet.
-- Discussions are a planned placeholder.
+- Issue comments, PR reviews, inline review threads, commits, CI checks, and release notes are captured when API permissions allow.
+- Discussions are not captured yet.
 - Rate-limit handling is basic.
 
 ## Roadmap
 
-- Issue and PR comments.
-- Pull request file summaries.
 - Discussions.
 - Repository dependency context.
+- GitHub App or OAuth setup instead of token-only configuration.

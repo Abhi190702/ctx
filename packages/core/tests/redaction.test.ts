@@ -7,4 +7,10 @@ describe("redactSecrets", () => {
     expect(result).toContain("[REDACTED");
     expect(result).not.toContain("abcdefghijklmnopqrstuvwxyz123456");
   });
+
+  it("redacts high-entropy credential assignments", () => {
+    const result = redactSecrets("SERVICE_ACCESS_TOKEN=QWxhZGRpbjpvcGVuIHNlc2FtZTEyMzQ1Njc4OTA=");
+    expect(result).toContain("[REDACTED_HIGH_ENTROPY_SECRET]");
+    expect(result).not.toContain("QWxhZGRpbjpvcGVu");
+  });
 });

@@ -7,22 +7,22 @@ export function PlatformUsage({ distribution }: { distribution: Record<string, n
 
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-white">Platform Usage</h2>
+      <h2 className="text-lg font-semibold text-foreground">Platform Usage</h2>
       <div className="mt-4 space-y-3">
         {entries.length ? (
           entries.map(([platform, count]) => (
             <div key={platform}>
               <div className="mb-1 flex justify-between text-sm">
-                <span className="text-slate-300">{platformLabel(platform)}</span>
-                <span className="text-slate-500">{count}</span>
+                <span className="text-muted-foreground">{platformLabel(platform)}</span>
+                <span className="text-muted">{count}</span>
               </div>
-              <div className="h-2 rounded-full bg-white/5">
+              <div className="h-2 rounded-full bg-ink">
                 <div className="h-2 rounded-full bg-mint" style={{ width: `${(count / max) * 100}%` }} />
               </div>
             </div>
           ))
         ) : (
-          <p className="text-sm text-slate-400">Platform data appears after capsules are created.</p>
+          <p className="text-sm text-muted-foreground">Platform data appears after capsules are created.</p>
         )}
       </div>
     </Card>

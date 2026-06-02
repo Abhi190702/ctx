@@ -10,10 +10,10 @@ export function GitHubPreview() {
 
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-white">Capture Preview</h2>
-      <div className="mt-4 overflow-hidden rounded-lg border border-line">
+      <h2 className="text-lg font-semibold text-foreground">Capture Preview</h2>
+      <div className="mt-4 overflow-hidden rounded-xl border border-line">
         <table className="w-full text-left text-sm">
-          <thead className="bg-white/[0.04] text-slate-300">
+          <thead className="bg-ink text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Structured Memory</th>
@@ -22,8 +22,8 @@ export function GitHubPreview() {
           <tbody className="divide-y divide-line">
             {rows.map(([type, detail]) => (
               <tr key={type}>
-                <td className="px-3 py-2 text-white">{type}</td>
-                <td className="px-3 py-2 text-slate-400">{detail}</td>
+                <td className="px-3 py-2 text-foreground">{type}</td>
+                <td className="px-3 py-2 text-muted-foreground">{detail}</td>
               </tr>
             ))}
           </tbody>

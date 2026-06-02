@@ -47,8 +47,8 @@ export function ProjectMemoryWorkspace({ memory }: { memory: ProjectMemory }) {
             <Card key={row.label} className="p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm text-slate-400">{row.label}</p>
-                  <p className="mt-2 text-3xl font-semibold text-white">{row.value}</p>
+                  <p className="text-sm text-muted-foreground">{row.label}</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">{row.value}</p>
                 </div>
                 <Icon aria-hidden="true" className={`h-5 w-5 ${row.tone}`} />
               </div>
@@ -61,26 +61,26 @@ export function ProjectMemoryWorkspace({ memory }: { memory: ProjectMemory }) {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-white">Agent Brief</h2>
-              <p className="mt-1 text-sm text-slate-400">Prepared context for continuing this project in an AI chat or coding agent.</p>
+              <h2 className="text-lg font-semibold text-foreground">Agent Brief</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Prepared context for continuing this project in an AI chat or coding agent.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <CopyProjectMemoryButton text={memory.agentBrief} />
               <CopyProjectMemoryButton text={memory.memoryPack} label="Copy Pack" />
             </div>
           </div>
-          <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-ink p-4 text-sm leading-6 text-slate-300">
+          <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-ink p-4 text-sm leading-6 text-muted-foreground">
             {memory.agentBrief}
           </pre>
         </Card>
 
         <Card>
-          <h2 className="text-lg font-semibold text-white">Task State</h2>
+          <h2 className="text-lg font-semibold text-foreground">Task State</h2>
           <div className="mt-4 space-y-4">
             <TaskGroup title="Blocked" items={memory.tasks.blocked} tone="text-rose" />
             <TaskGroup title="Active" items={memory.tasks.active} tone="text-mint" />
             <TaskGroup title="Planned" items={memory.tasks.planned} tone="text-sky" />
-            <TaskGroup title="Done" items={memory.tasks.done} tone="text-slate-400" />
+            <TaskGroup title="Done" items={memory.tasks.done} tone="text-muted-foreground" />
           </div>
         </Card>
       </div>
@@ -100,13 +100,13 @@ function TaskGroup({ title, items, tone }: { title: string; items: MemoryItem[];
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className={`text-sm font-semibold ${tone}`}>{title}</p>
-        <span className="text-xs text-slate-500">{items.length}</span>
+        <span className="text-xs text-muted">{items.length}</span>
       </div>
       <div className="mt-2 space-y-2">
         {items.slice(0, 4).map((item) => (
           <MemoryLink key={`${title}-${item.capsuleId}-${item.text}`} item={item} />
         ))}
-        {!items.length ? <p className="text-sm text-slate-500">Nothing here yet.</p> : null}
+        {!items.length ? <p className="text-sm text-muted">Nothing here yet.</p> : null}
       </div>
     </div>
   );
@@ -116,8 +116,8 @@ function MemorySection({ title, items, empty }: { title: string; items: MemoryIt
   return (
     <Card>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <span className="inline-flex items-center gap-1 text-xs text-muted">
           <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
           {items.length}
         </span>
@@ -126,7 +126,7 @@ function MemorySection({ title, items, empty }: { title: string; items: MemoryIt
         {items.slice(0, 8).map((item) => (
           <MemoryLink key={`${title}-${item.capsuleId}-${item.text}`} item={item} />
         ))}
-        {!items.length ? <p className="text-sm leading-6 text-slate-400">{empty}</p> : null}
+        {!items.length ? <p className="text-sm leading-6 text-muted-foreground">{empty}</p> : null}
       </div>
     </Card>
   );
@@ -134,9 +134,9 @@ function MemorySection({ title, items, empty }: { title: string; items: MemoryIt
 
 function MemoryLink({ item }: { item: MemoryItem }) {
   return (
-    <Link href={`/capsules/${item.capsuleId}`} className="block rounded-lg border border-line bg-white/[0.03] p-3 hover:border-mint/40">
-      <p className="text-sm leading-6 text-slate-200">{item.text}</p>
-      <p className="mt-1 text-xs text-slate-500">{item.capsuleTitle} · {formatDate(item.updatedAt)}</p>
+    <Link href={`/capsules/${item.capsuleId}`} className="block rounded-xl border border-line bg-ink p-3 hover:border-mint/40">
+      <p className="text-sm leading-6 text-foreground">{item.text}</p>
+      <p className="mt-1 text-xs text-muted">{item.capsuleTitle} / {formatDate(item.updatedAt)}</p>
     </Link>
   );
 }

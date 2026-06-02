@@ -17,7 +17,7 @@ export function CapsuleSearch({
         Search Capsules
       </label>
       <div className="relative">
-        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
         <input
           id="capsule-search"
           name="q"
@@ -25,7 +25,7 @@ export function CapsuleSearch({
           autoComplete="off"
           defaultValue={defaultValue}
           placeholder="Search title, summary, raw text..."
-          className="h-10 w-full rounded-lg border border-line bg-panel pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          className="h-10 w-full rounded-xl border border-line bg-panel pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
         />
       </div>
       <label className="sr-only" htmlFor="platform-filter">
@@ -35,7 +35,7 @@ export function CapsuleSearch({
         id="platform-filter"
         name="platform"
         defaultValue={defaultPlatform}
-        className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        className="h-10 rounded-xl border border-line bg-panel px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       >
         <option value="">All Platforms</option>
         <option value="chatgpt">ChatGPT</option>
@@ -55,7 +55,7 @@ export function CapsuleSearch({
         autoComplete="off"
         defaultValue={defaultTag}
         placeholder="Tag..."
-        className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        className="h-10 rounded-xl border border-line bg-panel px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       />
       <label className="sr-only" htmlFor="status-filter">
         Status
@@ -64,7 +64,7 @@ export function CapsuleSearch({
         id="status-filter"
         name="status"
         defaultValue={defaultStatus}
-        className="h-10 rounded-lg border border-line bg-panel px-3 text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        className="h-10 rounded-xl border border-line bg-panel px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       >
         <option value="active">Active</option>
         <option value="archived">Archived</option>

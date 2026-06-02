@@ -23,14 +23,14 @@ const nav = [
 
 export function AppSidebar() {
   return (
-    <aside className="hidden w-72 shrink-0 border-r border-line bg-ink/80 p-4 lg:block">
-      <Link href="/" className="mb-6 flex items-center gap-3 rounded-lg px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint">
-        <span className="grid h-10 w-10 place-items-center rounded-lg border border-mint/30 bg-mint/10 text-sm font-bold text-mint">
+    <aside className="hidden w-72 shrink-0 border-r border-line bg-panel/80 p-4 backdrop-blur-xl lg:block">
+      <Link href="/" className="mb-6 flex items-center gap-3 rounded-xl px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint">
+        <span className="grid h-10 w-10 place-items-center rounded-xl border border-mint/30 bg-mint/10 text-sm font-bold text-mint">
           CTX
         </span>
         <span>
-          <span className="block text-sm font-semibold text-white">CTX</span>
-          <span className="block text-xs text-slate-500">Portable memory</span>
+          <span className="block text-sm font-semibold text-foreground">CTX</span>
+          <span className="block text-xs text-muted">Portable memory</span>
         </span>
       </Link>
       <nav aria-label="Primary">
@@ -41,7 +41,7 @@ export function AppSidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors duration-150 hover:bg-white/6 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+                  className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-ink hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
                 >
                   <Icon aria-hidden="true" className="h-4 w-4" />
                   {item.label}

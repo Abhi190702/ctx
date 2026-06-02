@@ -37,7 +37,7 @@ export class CtxClient {
   }
 
   searchCapsules(query: string) {
-    return this.request(`/search?q=${encodeURIComponent(query)}`);
+    return this.request<any[]>(`/search?q=${encodeURIComponent(query)}`);
   }
 
   getCapsule(id: string) {
@@ -62,6 +62,10 @@ export class CtxClient {
     return this.request<any[]>("/capsules").then((capsules) => capsules.slice(0, limit));
   }
 
+  listProjects() {
+    return this.request<any[]>("/projects");
+  }
+
   exportCapsule(id: string) {
     return this.request(`/export?id=${encodeURIComponent(id)}`);
   }
@@ -80,5 +84,40 @@ export class CtxClient {
       : projects.find((item) => item.name.toLowerCase() === input.projectName?.toLowerCase());
     if (!project) throw new Error("Project not found.");
     return this.request(`/projects/${encodeURIComponent(project.id)}`);
+  }
+
+  async getAgentBrief(input: { projectId?: string; projectName?: string; task?: string }) {
+    const projectMemory = await this.getProjectMemory(input);
+    const query = [input.task, input.projectName].filter(Boolean).join(" ");
+    const relatedCapsules = query ? await this.searchCapsules(query).then((items) => items.slice(0, 8)) : await this.listRecentCapsules(8);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      task: input.task ?? null,
+      projectMemory,
+      relatedCapsules,
+      agentInstructions: [
+        "Use the project memory as durable context.",
+        "Prefer explicit decisions and constraints over assumptions.",
+        "Call CTX search again when the task mentions a subsystem, issue, PR, or platform not covered in this brief.",
+        "Do not overwrite capsule memory unless the user asks you to update CTX."
+      ]
+    };
+  }
+
+  async validateSetup() {
+    const [health, recentCapsules, projects] = await Promise.all([
+      this.health(),
+      this.listRecentCapsules(3),
+      this.listProjects()
+    ]);
+
+    return {
+      apiUrl: this.apiUrl,
+      health,
+      recentCapsules,
+      projectCount: projects.length,
+      ready: true
+    };
   }
 }

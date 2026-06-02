@@ -15,15 +15,18 @@ Implemented now:
 - GitHub deep capture for issue comments, PR reviews, inline review threads, commits, CI checks, and repository release notes when API permissions allow.
 - Version timeline, latest-version diff, restore previous version, archive/restore, bulk cleanup, activity history, backup export/restore, MCP server tools, and project memory views.
 - Backup integrity envelopes, backup inspection before restore, database integrity checks, and local persistence health in settings.
+- MCP resources, prompts, setup validation, semantic search tool alias, local file-to-capsule capture, and agent project briefing.
+- Release artifact staging with extension assets, Docker/examples/docs, install notes, and checksums.
+- Encrypted team share bundles for local-first workspace memory exchange.
 
 Still needs production polish:
 
-- Native-feeling extension placement for every supported platform.
 - Optional hosted AI extraction with user-owned API keys and local fallback.
 - True local embeddings for semantic search, duplicate detection, and related capsules.
-- Archive, bulk cleanup, restore previous version, scheduled backups, and signed extension packaging.
-- Scheduled backups, encrypted bundles, cloud sync provider interface, and signed extension packaging.
+- Native-feeling extension placement for every supported platform.
+- Scheduled backups, cloud sync provider interface, and signed extension packaging.
 - More guided onboarding with a first-run checklist and interactive sample data toggle.
+- Hosted teams with auth, RBAC, organization redaction policy, and review queues.
 
 ## Product Principles
 

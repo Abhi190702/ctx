@@ -27,3 +27,19 @@ pnpm extension:dev
 ```
 
 Load `apps/extension/dist` as an unpacked extension.
+
+## Release Packaging
+
+Build the full project and stage release artifacts:
+
+```bash
+pnpm release
+```
+
+The release folder includes:
+
+- `extension-unpacked` for Chrome Developer Mode loading.
+- `CHECKSUMS.txt` for file integrity verification.
+- `INSTALL.md` with web app, extension, MCP, and Docker instructions.
+
+Chrome Web Store signing still requires publisher credentials and store submission outside this repo.
