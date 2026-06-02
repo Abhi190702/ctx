@@ -45,11 +45,26 @@ type PlatformToolbarConfig = {
   insertPosition: InsertPosition;
 };
 
+type TokenUsageTotals = {
+  daily: number;
+  weekly: number;
+};
+
+type TokenUsageStore = {
+  dailyKey: string;
+  weeklyKey: string;
+  platforms: Record<string, TokenUsageTotals>;
+};
+
 const CTX_BUTTON_ID = "ctx-patchpilot-btn";
 const CTX_SHELL_ID = "ctx-patchpilot-shell";
 const CTX_WELCOME_ID = "ctx-patchpilot-welcome";
+const CTX_USAGE_METER_ID = "ctx-token-usage-meter";
 const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
+const TOKEN_USAGE_STORAGE_KEY = "ctxTokenUsage";
 const defaultLauncherSize = 26;
+const defaultDailyTokenLimit = 50000;
+const defaultWeeklyTokenLimit = 300000;
 const defaultWelcomeMessages = [
   "Your AI needs context",
   "Drop memory before you prompt",
@@ -71,6 +86,14 @@ let picker: HTMLElement | null = null;
 let welcomeAnchor: HTMLElement | null = null;
 let welcomeHost: HTMLElement | null = null;
 let welcomeTimer: number | null = null;
+let usageMeterAnchor: HTMLElement | null = null;
+let usageMeterHost: HTMLElement | null = null;
+let usageRefreshTimer: number | null = null;
+let usageUpdateFrame = 0;
+let usageRefreshTicks = 0;
+let lastTokenRecordSignature = "";
+let lastTokenRecordAt = 0;
+const usageTrackedElements = new WeakSet<HTMLElement>();
 let menuOpen = false;
 const ctxWindow = window as Window & {
   __CTX_CONTENT_READY__?: boolean;
@@ -313,6 +336,8 @@ function installNavigationWatcher() {
   window.addEventListener("hashchange", scheduleNavigationReset, { passive: true });
   window.addEventListener("resize", repositionWelcomeMessage, { passive: true });
   window.addEventListener("scroll", repositionWelcomeMessage, { passive: true, capture: true });
+  window.addEventListener("resize", repositionUsageMeter, { passive: true });
+  window.addEventListener("scroll", repositionUsageMeter, { passive: true, capture: true });
 
   const originalPushState = history.pushState.bind(history);
   history.pushState = ((...args: Parameters<History["pushState"]>) => {
@@ -340,6 +365,7 @@ function scheduleNavigationReset() {
 function resetInjectionState() {
   stopInjectionWatcher();
   hideWelcomeMessage();
+  stopUsageMeter();
   document.getElementById(CTX_BUTTON_ID)?.closest(`#${CTX_SHELL_ID}`)?.remove();
   menuOpen = false;
   startInjectionWatcher();
@@ -461,6 +487,7 @@ function mountCtxButton() {
     if (slot) {
       insertLauncherShell(existingShell, slot);
       syncLauncherMetrics(existingShell, existingButton, slot.refElement);
+      startUsageMeter(slot);
     }
     stopInjectionWatcher();
     return true;
@@ -470,6 +497,7 @@ function mountCtxButton() {
 
   const shell = createLauncherShell(slot.refElement);
   insertLauncherShell(shell, slot);
+  startUsageMeter(slot);
   stopInjectionWatcher();
   return true;
 }
@@ -994,6 +1022,13 @@ function cleanupLegacyLaunchers() {
     }
     element.remove();
   });
+  document.querySelectorAll<HTMLElement>(`#${CTX_USAGE_METER_ID}`).forEach((element, index) => {
+    if (index === 0) {
+      usageMeterHost = element;
+      return;
+    }
+    element.remove();
+  });
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`#${CTX_BUTTON_ID}`));
   buttons.slice(1).forEach((button) => button.closest(`#${CTX_SHELL_ID}`)?.remove() ?? button.remove());
 }
@@ -1152,6 +1187,439 @@ function parseWelcomeMessages(value: unknown) {
 function pickWelcomeMessage(messages: string[]) {
   if (!messages.length) return "";
   return messages[Math.floor(Math.random() * messages.length)] ?? messages[0];
+}
+
+function startUsageMeter(slot: ToolbarSlot) {
+  const anchor = findUsageAnchor(slot);
+  if (!anchor) return;
+
+  usageMeterAnchor = anchor;
+  usageRefreshTicks = 0;
+  ensureUsageMeterHost();
+  attachUsageTracking(anchor);
+  scheduleUsageMeterUpdate();
+  startUsageRefreshLoop();
+}
+
+function stopUsageMeter() {
+  if (usageUpdateFrame) {
+    window.cancelAnimationFrame(usageUpdateFrame);
+    usageUpdateFrame = 0;
+  }
+  if (usageRefreshTimer) {
+    window.clearInterval(usageRefreshTimer);
+    usageRefreshTimer = null;
+  }
+  usageRefreshTicks = 0;
+  usageMeterAnchor = null;
+  usageMeterHost?.remove();
+  usageMeterHost = null;
+}
+
+function findUsageAnchor(slot: ToolbarSlot) {
+  const prompt = findPrompt(detectPlatform());
+  const composer = prompt ? findComposerElement(prompt) : null;
+  if (composer && isVisibleElement(composer)) return composer;
+  if (slot.toolbar && isVisibleElement(slot.toolbar)) return slot.toolbar;
+  return slot.refElement.parentElement ?? slot.refElement;
+}
+
+function ensureUsageMeterHost() {
+  const existing = document.getElementById(CTX_USAGE_METER_ID);
+  if (existing) {
+    usageMeterHost = existing;
+    return existing;
+  }
+
+  const host = document.createElement("div");
+  host.id = CTX_USAGE_METER_ID;
+  host.setAttribute("aria-hidden", "true");
+  host.innerHTML = `
+    <style>
+      #${CTX_USAGE_METER_ID} {
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        z-index: 2147483646 !important;
+        width: min(760px, calc(100vw - 24px));
+        pointer-events: none !important;
+        box-sizing: border-box !important;
+        color-scheme: dark;
+        contain: layout style paint;
+        opacity: .96;
+      }
+      #${CTX_USAGE_METER_ID} .meter {
+        display: grid;
+        grid-template-columns: minmax(86px, .7fr) minmax(118px, 1fr) minmax(118px, 1fr);
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 26px;
+        padding: 5px 8px;
+        border: 1px solid rgba(139,245,207,.20);
+        border-radius: 999px;
+        background: rgba(5,8,18,.78);
+        box-shadow: 0 10px 34px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.035);
+        backdrop-filter: blur(14px);
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #${CTX_USAGE_METER_ID} .platform {
+        min-width: 0;
+        overflow: hidden;
+        color: #d1fae5;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .02em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #${CTX_USAGE_METER_ID} .quota {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: auto minmax(34px, 1fr) auto;
+        align-items: center;
+        gap: 5px;
+      }
+      #${CTX_USAGE_METER_ID} .label,
+      #${CTX_USAGE_METER_ID} .value {
+        color: #a7f3d0;
+        font-size: 9px;
+        font-weight: 850;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      #${CTX_USAGE_METER_ID} .value {
+        color: #cbd5e1;
+        text-align: right;
+      }
+      #${CTX_USAGE_METER_ID} .track {
+        height: 5px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148,163,184,.20);
+      }
+      #${CTX_USAGE_METER_ID} .fill {
+        width: 0%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #5eead4, #8bf5cf);
+        transition: width 180ms ease, background 180ms ease;
+      }
+      #${CTX_USAGE_METER_ID}[data-level="watch"] .fill {
+        background: linear-gradient(90deg, #facc15, #fb923c);
+      }
+      #${CTX_USAGE_METER_ID}[data-level="danger"] .fill {
+        background: linear-gradient(90deg, #fb7185, #f97316);
+      }
+      @media (max-width: 560px) {
+        #${CTX_USAGE_METER_ID} .meter {
+          grid-template-columns: 1fr 1fr;
+          border-radius: 14px;
+        }
+        #${CTX_USAGE_METER_ID} .platform {
+          grid-column: 1 / -1;
+        }
+      }
+    </style>
+    <section class="meter">
+      <span class="platform">CTX Tokens</span>
+      <span class="quota daily">
+        <span class="label">Today</span>
+        <span class="track"><span class="fill"></span></span>
+        <span class="value">0 / 50k</span>
+      </span>
+      <span class="quota weekly">
+        <span class="label">Week</span>
+        <span class="track"><span class="fill"></span></span>
+        <span class="value">0 / 300k</span>
+      </span>
+    </section>
+  `;
+  document.documentElement.append(host);
+  usageMeterHost = host;
+  return host;
+}
+
+function startUsageRefreshLoop() {
+  if (usageRefreshTimer) return;
+  usageRefreshTimer = window.setInterval(() => {
+    usageRefreshTicks += 1;
+    if (!usageMeterAnchor?.isConnected || usageRefreshTicks % 5 === 0) {
+      const slot = findToolbarSlot();
+      if (slot) usageMeterAnchor = findUsageAnchor(slot);
+    }
+    attachUsageTracking(usageMeterAnchor);
+    scheduleUsageMeterUpdate();
+  }, 800);
+}
+
+function scheduleUsageMeterUpdate() {
+  if (usageUpdateFrame) return;
+  usageUpdateFrame = window.requestAnimationFrame(() => {
+    usageUpdateFrame = 0;
+    void updateUsageMeter();
+  });
+}
+
+async function updateUsageMeter() {
+  if (!usageMeterAnchor?.isConnected) return;
+  const host = ensureUsageMeterHost();
+  positionUsageMeterHost(host, usageMeterAnchor);
+
+  const platform = detectPlatform();
+  const settings = await readTokenMeterSettings();
+  const store = await readTokenUsageStore();
+  const totals = store.platforms[platform] ?? { daily: 0, weekly: 0 };
+  const currentPromptTokens = estimateTokens(readPromptText(findPrompt(platform)));
+  const dailyPercent = percentUsed(totals.daily + currentPromptTokens, settings.tokenDailyLimit);
+  const weeklyPercent = percentUsed(totals.weekly + currentPromptTokens, settings.tokenWeeklyLimit);
+  const level = Math.max(dailyPercent, weeklyPercent) >= 92 ? "danger" : Math.max(dailyPercent, weeklyPercent) >= 76 ? "watch" : "ok";
+
+  host.dataset.level = level;
+  const platformText = host.querySelector<HTMLElement>(".platform");
+  const dailyFill = host.querySelector<HTMLElement>(".daily .fill");
+  const weeklyFill = host.querySelector<HTMLElement>(".weekly .fill");
+  const dailyValue = host.querySelector<HTMLElement>(".daily .value");
+  const weeklyValue = host.querySelector<HTMLElement>(".weekly .value");
+
+  if (platformText) platformText.textContent = `${platformLabel(platform)} · now ${formatTokenCount(currentPromptTokens)}`;
+  if (dailyFill) dailyFill.style.width = `${Math.round(dailyPercent)}%`;
+  if (weeklyFill) weeklyFill.style.width = `${Math.round(weeklyPercent)}%`;
+  if (dailyValue) dailyValue.textContent = `${formatTokenCount(totals.daily)} / ${formatTokenCount(settings.tokenDailyLimit)}`;
+  if (weeklyValue) weeklyValue.textContent = `${formatTokenCount(totals.weekly)} / ${formatTokenCount(settings.tokenWeeklyLimit)}`;
+}
+
+function positionUsageMeterHost(host: HTMLElement, anchor: HTMLElement) {
+  const anchorRect = anchor.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const width = Math.round(clampNumber(anchorRect.width - 12, 280, 860));
+  const height = hostRect.height || 28;
+  const viewportPadding = 6;
+  let left = anchorRect.left + (anchorRect.width - width) / 2;
+  let top = anchorRect.bottom + 6;
+
+  if (top + height > window.innerHeight - viewportPadding) top = anchorRect.top - height - 6;
+  left = clampNumber(left, viewportPadding, Math.max(viewportPadding, window.innerWidth - width - viewportPadding));
+  top = clampNumber(top, viewportPadding, Math.max(viewportPadding, window.innerHeight - height - viewportPadding));
+
+  host.style.width = `${width}px`;
+  host.style.left = `${Math.round(left)}px`;
+  host.style.top = `${Math.round(top)}px`;
+}
+
+function repositionUsageMeter() {
+  if (!usageMeterHost || !usageMeterAnchor?.isConnected) return;
+  window.requestAnimationFrame(() => {
+    if (usageMeterHost && usageMeterAnchor?.isConnected) positionUsageMeterHost(usageMeterHost, usageMeterAnchor);
+  });
+}
+
+function attachUsageTracking(anchor: HTMLElement | null) {
+  const platform = detectPlatform();
+  const prompt = findPrompt(platform);
+  if (prompt && !usageTrackedElements.has(prompt)) {
+    usageTrackedElements.add(prompt);
+    prompt.addEventListener("input", scheduleUsageMeterUpdate, { passive: true });
+    prompt.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        void recordPromptUsage();
+      }
+    }, true);
+  }
+
+  const composer = anchor ?? (prompt ? findComposerElement(prompt) : null);
+  if (!composer) return;
+  const controls = queryVisibleElements("button,[role='button']", composer);
+  for (const control of controls) {
+    if (usageTrackedElements.has(control) || isInsideCtxLauncher(control)) continue;
+    usageTrackedElements.add(control);
+    control.addEventListener("pointerdown", () => {
+      if (isLikelySendControl(control, composer)) void recordPromptUsage();
+    }, true);
+    control.addEventListener("click", () => {
+      if (isLikelySendControl(control, composer)) void recordPromptUsage();
+    }, true);
+  }
+
+  const form = composer.closest("form");
+  if (form && !usageTrackedElements.has(form)) {
+    usageTrackedElements.add(form);
+    form.addEventListener("submit", () => void recordPromptUsage(), true);
+  }
+}
+
+function isLikelySendControl(control: HTMLElement, composer: HTMLElement) {
+  const label = controlText(control);
+  if (/\b(microphone|mic|dictate|voice|audio|attach|upload|file|paperclip|plus|search|deepthink|think|smart|pro)\b/.test(label)) return false;
+  if (/\b(send|submit|arrow|up)\b/.test(label)) return true;
+  if (matchesSelector(control, "button[type='submit']")) return true;
+
+  const controlRect = control.getBoundingClientRect();
+  const composerRect = composer.getBoundingClientRect();
+  return controlRect.width <= 54 && controlRect.height <= 54 && controlRect.right >= composerRect.right - 76;
+}
+
+async function recordPromptUsage() {
+  const platform = detectPlatform();
+  const prompt = findPrompt(platform);
+  const text = readPromptText(prompt);
+  const tokens = estimateTokens(text);
+  if (tokens <= 0) return;
+
+  const signature = `${platform}:${hashText(text)}:${tokens}`;
+  const now = Date.now();
+  if (signature === lastTokenRecordSignature && now - lastTokenRecordAt < 8000) return;
+  lastTokenRecordSignature = signature;
+  lastTokenRecordAt = now;
+
+  await addTokenUsage(platform, tokens);
+}
+
+async function addTokenUsage(platform: Platform, tokens: number) {
+  const store = await readTokenUsageStore();
+  const current = store.platforms[platform] ?? { daily: 0, weekly: 0 };
+  store.platforms[platform] = {
+    daily: current.daily + tokens,
+    weekly: current.weekly + tokens
+  };
+  await chrome.storage.local.set({ [TOKEN_USAGE_STORAGE_KEY]: store });
+  scheduleUsageMeterUpdate();
+}
+
+async function readTokenUsageStore(): Promise<TokenUsageStore> {
+  const defaults = createTokenUsageStore();
+  const stored = await chrome.storage.local.get({ [TOKEN_USAGE_STORAGE_KEY]: defaults });
+  const value = stored[TOKEN_USAGE_STORAGE_KEY] as Partial<TokenUsageStore> | undefined;
+  const dailyKey = currentDailyKey();
+  const weeklyKey = currentWeeklyKey();
+  return {
+    dailyKey,
+    weeklyKey,
+    platforms: resetExpiredUsage(value, dailyKey, weeklyKey)
+  };
+}
+
+function createTokenUsageStore(): TokenUsageStore {
+  return {
+    dailyKey: currentDailyKey(),
+    weeklyKey: currentWeeklyKey(),
+    platforms: {}
+  };
+}
+
+function resetExpiredUsage(value: Partial<TokenUsageStore> | undefined, dailyKey: string, weeklyKey: string) {
+  const platforms = value?.platforms ?? {};
+  const next: Record<string, TokenUsageTotals> = {};
+  for (const [platform, totals] of Object.entries(platforms)) {
+    next[platform] = {
+      daily: value?.dailyKey === dailyKey ? Math.max(0, Number(totals?.daily) || 0) : 0,
+      weekly: value?.weeklyKey === weeklyKey ? Math.max(0, Number(totals?.weekly) || 0) : 0
+    };
+  }
+  return next;
+}
+
+async function readTokenMeterSettings() {
+  const settings = await chrome.storage.local.get({
+    tokenDailyLimit: defaultDailyTokenLimit,
+    tokenWeeklyLimit: defaultWeeklyTokenLimit
+  });
+  return {
+    tokenDailyLimit: Math.max(1000, Number(settings.tokenDailyLimit) || defaultDailyTokenLimit),
+    tokenWeeklyLimit: Math.max(1000, Number(settings.tokenWeeklyLimit) || defaultWeeklyTokenLimit)
+  };
+}
+
+function readPromptText(prompt: HTMLElement | null) {
+  if (!prompt) return "";
+  let text = "";
+  if (prompt instanceof HTMLTextAreaElement || prompt instanceof HTMLInputElement) {
+    text = prompt.value;
+  } else if (prompt.isContentEditable || prompt.getAttribute("role") === "textbox") {
+    text = prompt.innerText || prompt.textContent || "";
+  } else {
+    const editable = prompt.querySelector<HTMLElement>("textarea,input,[contenteditable='true'],[role='textbox']");
+    text = readPromptText(editable);
+  }
+  return normalizePromptText(text);
+}
+
+function normalizePromptText(text: string) {
+  const normalized = text.replace(/\u200b/g, "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (/^(ask anything|ask gemini|how can i help you today\??|message .+|write a message\.*|describe your idea.*)$/i.test(normalized)) return "";
+  return normalized;
+}
+
+function estimateTokens(text: string) {
+  const normalized = normalizePromptText(text);
+  if (!normalized) return 0;
+  const wordCount = normalized.match(/[A-Za-z0-9_]+|[^\sA-Za-z0-9_]/g)?.length ?? 0;
+  return Math.max(1, Math.ceil(Math.max(normalized.length / 4, wordCount * 1.25)));
+}
+
+function percentUsed(used: number, limit: number) {
+  return clampNumber(limit > 0 ? (used / limit) * 100 : 0, 0, 100);
+}
+
+function formatTokenCount(value: number) {
+  if (value >= 1000000) return `${trimNumber(value / 1000000)}m`;
+  if (value >= 1000) return `${trimNumber(value / 1000)}k`;
+  return String(Math.max(0, Math.round(value)));
+}
+
+function trimNumber(value: number) {
+  return value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function platformLabel(platform: Platform) {
+  const labels: Record<Platform, string> = {
+    chatgpt: "ChatGPT",
+    claude: "Claude",
+    gemini: "Gemini",
+    perplexity: "Perplexity",
+    github: "GitHub",
+    cursor: "Cursor",
+    copilot: "Copilot",
+    deepseek: "DeepSeek",
+    grok: "Grok",
+    poe: "Poe",
+    mistral: "Mistral",
+    meta: "Meta",
+    qwen: "Qwen",
+    lovable: "Lovable",
+    replit: "Replit",
+    emergent: "Emergent",
+    v0: "v0",
+    bolt: "Bolt",
+    notebooklm: "NotebookLM",
+    generic: "AI"
+  };
+  return labels[platform];
+}
+
+function currentDailyKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function currentWeeklyKey(date = new Date()) {
+  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = copy.getDay() || 7;
+  copy.setDate(copy.getDate() + 4 - day);
+  const yearStart = new Date(copy.getFullYear(), 0, 1);
+  const week = Math.ceil(((copy.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${copy.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function hashText(text: string) {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 33) ^ text.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function queryVisibleElements(selector: string, root: Document | HTMLElement = document) {
@@ -1430,6 +1898,7 @@ function insertTextIntoPrompt(target: HTMLElement, text: string) {
     target.value = `${target.value.slice(0, start)}${text}${target.value.slice(end)}`;
     target.dispatchEvent(new Event("input", { bubbles: true }));
     target.focus();
+    scheduleUsageMeterUpdate();
     return true;
   }
 
@@ -1437,6 +1906,7 @@ function insertTextIntoPrompt(target: HTMLElement, text: string) {
     target.focus();
     document.execCommand("insertText", false, text);
     target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    scheduleUsageMeterUpdate();
     return true;
   }
 

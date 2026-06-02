@@ -20,6 +20,21 @@ form {
   background: #10141d;
 }
 
+fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 14px;
+  border: 1px solid #232a36;
+  border-radius: 8px;
+}
+
+legend {
+  color: #8bf5cf;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
 input,
 textarea,
 button {

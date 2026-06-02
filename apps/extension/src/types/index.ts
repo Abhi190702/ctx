@@ -17,4 +17,6 @@ export type Capsule = {
 export type ExtensionSettings = {
   apiUrl: string;
   welcomeMessage: string;
+  tokenDailyLimit: number;
+  tokenWeeklyLimit: number;
 };

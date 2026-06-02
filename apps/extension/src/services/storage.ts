@@ -12,7 +12,9 @@ const defaultWelcomeMessages = [
 
 const defaults: ExtensionSettings = {
   apiUrl: "http://localhost:3000/api",
-  welcomeMessage: defaultWelcomeMessages
+  welcomeMessage: defaultWelcomeMessages,
+  tokenDailyLimit: 50000,
+  tokenWeeklyLimit: 300000
 };
 
 export async function getSettings(): Promise<ExtensionSettings> {

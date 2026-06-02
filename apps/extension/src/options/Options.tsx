@@ -14,18 +14,27 @@ const defaultWelcomeMessages = [
 export function Options() {
   const [apiUrl, setApiUrl] = useState("http://localhost:3000/api");
   const [welcomeMessage, setWelcomeMessage] = useState(defaultWelcomeMessages);
+  const [tokenDailyLimit, setTokenDailyLimit] = useState(50000);
+  const [tokenWeeklyLimit, setTokenWeeklyLimit] = useState(300000);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     getSettings().then((settings) => {
       setApiUrl(settings.apiUrl);
       setWelcomeMessage(settings.welcomeMessage);
+      setTokenDailyLimit(settings.tokenDailyLimit);
+      setTokenWeeklyLimit(settings.tokenWeeklyLimit);
     });
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await saveSettings({ apiUrl, welcomeMessage: welcomeMessage.trim() || defaultWelcomeMessages });
+    await saveSettings({
+      apiUrl,
+      welcomeMessage: welcomeMessage.trim() || defaultWelcomeMessages,
+      tokenDailyLimit: Math.max(1000, Math.round(tokenDailyLimit || 50000)),
+      tokenWeeklyLimit: Math.max(1000, Math.round(tokenWeeklyLimit || 300000))
+    });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
   }
@@ -46,6 +55,29 @@ export function Options() {
           onChange={(event) => setWelcomeMessage(event.target.value)}
           spellCheck={false}
         />
+        <fieldset>
+          <legend>Token usage meter</legend>
+          <label htmlFor="token-daily-limit">Daily token budget</label>
+          <input
+            id="token-daily-limit"
+            min={1000}
+            name="tokenDailyLimit"
+            step={1000}
+            type="number"
+            value={tokenDailyLimit}
+            onChange={(event) => setTokenDailyLimit(Number(event.target.value))}
+          />
+          <label htmlFor="token-weekly-limit">Weekly token budget</label>
+          <input
+            id="token-weekly-limit"
+            min={1000}
+            name="tokenWeeklyLimit"
+            step={1000}
+            type="number"
+            value={tokenWeeklyLimit}
+            onChange={(event) => setTokenWeeklyLimit(Number(event.target.value))}
+          />
+        </fieldset>
         <button type="submit">Save Settings</button>
       </form>
       {saved ? <p aria-live="polite">Saved.</p> : null}
