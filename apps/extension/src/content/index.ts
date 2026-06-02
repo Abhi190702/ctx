@@ -48,7 +48,7 @@ type PlatformToolbarConfig = {
 const CTX_BUTTON_ID = "ctx-patchpilot-btn";
 const CTX_SHELL_ID = "ctx-patchpilot-shell";
 const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
-const defaultLauncherSize = 28;
+const defaultLauncherSize = 26;
 let injectionObserver: MutationObserver | null = null;
 let fallbackTimer: number | null = null;
 let retryTimer: number | null = null;
@@ -96,10 +96,11 @@ const PLATFORM_CONFIG: Record<string, PlatformToolbarConfig> = {
       "[data-testid='composer'] div:has(> button[data-testid='send-button'])"
     ],
     refSelectors: [
-      "button[data-testid='composer-speech-button']",
       "button[aria-label*='dictate' i]",
       "button[aria-label*='microphone' i]",
+      "button[aria-label*='mic' i]",
       "button[aria-label*='voice' i]",
+      "button[data-testid='composer-speech-button']",
       "button[data-testid='send-button']",
       "button[aria-label*='send' i]"
     ],
@@ -115,10 +116,11 @@ const PLATFORM_CONFIG: Record<string, PlatformToolbarConfig> = {
       "[data-testid='composer'] div:has(> button[data-testid='send-button'])"
     ],
     refSelectors: [
-      "button[data-testid='composer-speech-button']",
       "button[aria-label*='dictate' i]",
       "button[aria-label*='microphone' i]",
+      "button[aria-label*='mic' i]",
       "button[aria-label*='voice' i]",
+      "button[data-testid='composer-speech-button']",
       "button[data-testid='send-button']",
       "button[aria-label*='send' i]"
     ],
@@ -134,10 +136,10 @@ const PLATFORM_CONFIG: Record<string, PlatformToolbarConfig> = {
       "div:has(> voice-input-toggle)"
     ],
     refSelectors: [
-      "voice-input-toggle",
       "button[aria-label*='microphone' i]",
       "button[aria-label*='mic' i]",
       "button[aria-label*='voice' i]",
+      "voice-input-toggle",
       "button[aria-label*='send' i]",
       "button[aria-label*='submit' i]"
     ],
@@ -683,7 +685,7 @@ type ToolbarSlot = {
 
 function findToolbarSlot(): ToolbarSlot | null {
   const config = getToolbarConfig();
-  return findSlotFromToolbars(config) ?? findSlotFromReferences(config) ?? findSlotFromToolbars(genericToolbarConfig) ?? findSlotFromReferences(genericToolbarConfig);
+  return findSlotFromReferences(config) ?? findSlotFromToolbars(config) ?? findSlotFromReferences(genericToolbarConfig) ?? findSlotFromToolbars(genericToolbarConfig);
 }
 
 function getToolbarConfig(host = location.hostname) {
@@ -701,7 +703,7 @@ function findSlotFromToolbars(config: PlatformToolbarConfig): ToolbarSlot | null
       if (isInsideCtxLauncher(toolbar)) continue;
       const refElement = findReferenceElement(toolbar, config.refSelectors) ?? findReferenceElement(toolbar, genericToolbarConfig.refSelectors);
       if (!refElement) continue;
-      return { toolbar, refElement, insertPosition: config.insertPosition };
+      return normalizeToolbarSlot(toolbar, refElement, config.insertPosition);
     }
   }
   return null;
@@ -713,7 +715,7 @@ function findSlotFromReferences(config: PlatformToolbarConfig): ToolbarSlot | nu
       if (isInsideCtxLauncher(refElement)) continue;
       const toolbar = findToolbarForReference(refElement, config);
       if (!toolbar) continue;
-      return { toolbar, refElement, insertPosition: config.insertPosition };
+      return normalizeToolbarSlot(toolbar, refElement, config.insertPosition);
     }
   }
   return null;
@@ -739,6 +741,48 @@ function findToolbarForReference(refElement: HTMLElement, config: PlatformToolba
   return refElement.parentElement;
 }
 
+function normalizeToolbarSlot(toolbar: HTMLElement, refElement: HTMLElement, insertPosition: InsertPosition): ToolbarSlot {
+  let target = refElement;
+  let parent = target.parentElement;
+
+  for (let depth = 0; parent && depth < 7; depth += 1) {
+    if (isInsideCtxLauncher(parent)) break;
+    if (isHorizontalToolbarParent(parent, target)) {
+      return { toolbar: parent, refElement: target, insertPosition };
+    }
+    target = parent;
+    parent = target.parentElement;
+  }
+
+  return { toolbar, refElement, insertPosition };
+}
+
+function isHorizontalToolbarParent(parent: HTMLElement, target: HTMLElement) {
+  const parentRect = parent.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  if (!isVisibleRect(parentRect) || !isVisibleRect(targetRect) || parentRect.height > 104 || parentRect.width < targetRect.width + 18) return false;
+
+  const style = window.getComputedStyle(parent);
+  const children = Array.from(parent.children).filter((child): child is HTMLElement => {
+    return child instanceof HTMLElement && !isInsideCtxLauncher(child) && isVisibleElement(child);
+  });
+  const rowChildren = children.filter((child) => {
+    const rect = child.getBoundingClientRect();
+    return Math.abs(verticalCenter(rect) - verticalCenter(targetRect)) <= Math.max(14, Math.min(parentRect.height / 2, 28));
+  });
+  const horizontalSpread = rowChildren.reduce((spread, child) => {
+    const rect = child.getBoundingClientRect();
+    return {
+      left: Math.min(spread.left, rect.left),
+      right: Math.max(spread.right, rect.right)
+    };
+  }, { left: Number.POSITIVE_INFINITY, right: Number.NEGATIVE_INFINITY });
+  const hasNearbySibling = rowChildren.length >= 2 && horizontalSpread.right - horizontalSpread.left > targetRect.width + 16;
+  const isFlexRow = (style.display.includes("flex") || style.display.includes("grid")) && style.flexDirection !== "column";
+
+  return hasNearbySibling || (isFlexRow && children.length >= 2);
+}
+
 function isUsableToolbar(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   if (!isVisibleRect(rect) || rect.width < 32 || rect.height < 18 || rect.height > 120) return false;
@@ -761,7 +805,7 @@ function syncLauncherMetrics(shell: HTMLElement, button: HTMLButtonElement, refE
   const refStyle = window.getComputedStyle(refElement);
   const refRect = refElement.getBoundingClientRect();
   const rawSize = parseFloat(refStyle.height) || refRect.height || defaultLauncherSize;
-  const size = Math.round(clampNumber(rawSize, 24, 38));
+  const size = Math.round(clampNumber(rawSize, 24, 32));
   shell.style.setProperty("--ctx-toolbar-button-size", `${size}px`);
   shell.style.setProperty("--ctx-toolbar-button-radius", refStyle.borderRadius && refStyle.borderRadius !== "0px" ? refStyle.borderRadius : "999px");
   button.style.height = `${size}px`;
@@ -801,6 +845,10 @@ function isVisibleElement(element: HTMLElement) {
 
 function isVisibleRect(rect: DOMRect) {
   return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+}
+
+function verticalCenter(rect: DOMRect) {
+  return rect.top + rect.height / 2;
 }
 
 function clampNumber(value: number, min: number, max: number) {
