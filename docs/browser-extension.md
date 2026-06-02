@@ -28,6 +28,16 @@ pnpm extension:dev
 
 Load `apps/extension/dist` as an unpacked extension.
 
+After rebuilding the extension, Chrome does not automatically inject the new content script into tabs that are already open. Go to `chrome://extensions`, click the reload button on CTX, then refresh ChatGPT/Claude/Gemini/Perplexity/GitHub.
+
+If the popup opens but no CTX button appears on an AI page:
+
+1. Confirm the web app is running at `http://localhost:3000`.
+2. Confirm the popup API URL is `http://localhost:3000/api`.
+3. Reload CTX from `chrome://extensions`.
+4. Refresh the AI page once.
+5. Open the page console and look for content script errors if the button still does not appear.
+
 ## Release Packaging
 
 Build the full project and stage release artifacts:

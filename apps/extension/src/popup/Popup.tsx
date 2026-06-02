@@ -10,14 +10,26 @@ export function Popup() {
 
   useEffect(() => {
     getSettings().then((settings) => setApiUrl(settings.apiUrl));
-    fetchCapsules().then((items) => setCapsules(items.slice(0, 4))).catch(() => setCapsules([]));
+    fetchCapsules()
+      .then((items) => {
+        setCapsules(items.slice(0, 4));
+        setMessage(items.length ? "" : "No capsules yet. Create or capture one first.");
+      })
+      .catch(() => {
+        setCapsules([]);
+        setMessage("CTX app is not reachable. Start pnpm dev and keep this URL as /api.");
+      });
   }, []);
 
   async function send(type: string) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab.id) return;
-    const response = await chrome.tabs.sendMessage(tab.id, { type });
-    setMessage(response?.ok ? "Captured into CTX." : response?.error ?? "Action failed.");
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab.id) return;
+      const response = await chrome.tabs.sendMessage(tab.id, { type });
+      setMessage(response?.ok ? "Captured into CTX." : response?.error ?? "Action failed.");
+    } catch {
+      setMessage("Reload this AI page once after installing or updating CTX.");
+    }
   }
 
   async function saveApiUrl(value: string) {
