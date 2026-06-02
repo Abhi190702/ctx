@@ -191,6 +191,14 @@ function mountCtxButton() {
         backdrop-filter: blur(14px);
       }
       .menu[data-open="true"] { display: block; }
+      :host([data-platform="claude"]) .menu {
+        bottom: auto;
+        top: 42px;
+      }
+      :host([data-platform="claude"]) .toast {
+        bottom: auto;
+        top: 42px;
+      }
       .menu button {
         width: 100%;
         display: flex;
@@ -317,6 +325,7 @@ function placeButton(host: HTMLElement) {
   const composer = findComposer(platform, prompt);
   const anchor = composer ? findActionAnchor(composer, platform) : null;
   const position = anchor ?? fallbackPosition();
+  host.dataset.platform = platform;
 
   host.style.left = `${Math.round(position.left)}px`;
   host.style.top = `${Math.round(position.top)}px`;
@@ -433,12 +442,21 @@ function isVisibleRect(rect: DOMRect) {
 }
 
 function findActionAnchor(composer: DOMRect, platform: Platform) {
+  if (platform === "claude") return findClaudeAnchor(composer);
+
   const controls = findComposerControls(composer, platform);
   const firstRightControl = controls[0];
   const centerY = firstRightControl ? verticalCenter(firstRightControl) : composer.bottom - Math.min(30, composer.height / 2);
   const centerX = firstRightControl ? firstRightControl.left - launcherGap - launcherSize / 2 : composer.right - fallbackInsetForPlatform(platform);
   const left = clamp(centerX - launcherSize / 2, composer.left + 12, composer.right - launcherSize - 12);
   const top = clamp(centerY - launcherSize / 2, composer.top + 8, composer.bottom - launcherSize - 8);
+  return { left, top };
+}
+
+function findClaudeAnchor(composer: DOMRect) {
+  const topSpace = Math.max(8, Math.min(18, composer.height * 0.14));
+  const left = clamp(composer.right - launcherSize - 22, composer.left + 14, composer.right - launcherSize - 14);
+  const top = clamp(composer.top + topSpace, composer.top + 8, composer.bottom - launcherSize - 54);
   return { left, top };
 }
 
