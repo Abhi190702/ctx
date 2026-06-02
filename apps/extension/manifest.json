@@ -3,7 +3,7 @@
   "name": "CTX",
   "description": "Portable memory for AI workflows.",
   "version": "0.1.0",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "http://localhost/*",
     "http://127.0.0.1/*",

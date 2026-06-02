@@ -20,11 +20,18 @@ type DropMode = "smart" | "brief" | "full";
 let buttonHost: HTMLElement | null = null;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
+const ctxWindow = window as Window & { __CTX_CONTENT_READY__?: boolean };
 
-mountCtxButton();
+if (ctxWindow.__CTX_CONTENT_READY__) {
+  mountCtxButton();
+  return;
+}
+
+ctxWindow.__CTX_CONTENT_READY__ = true;
 
 const observer = new MutationObserver(() => mountCtxButton());
 observer.observe(document.documentElement, { childList: true, subtree: true });
+mountCtxButton();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "ctx:ping-content") {

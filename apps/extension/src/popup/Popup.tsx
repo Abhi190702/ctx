@@ -24,7 +24,10 @@ export function Popup() {
 
   async function ensureContentScript() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab.id || !tab.url || !isSupportedPage(tab.url)) return false;
+    const tabUrl = tab.url || tab.pendingUrl || "";
+    if (!tab.id) throw new Error("No active tab found.");
+    if (!tabUrl) throw new Error("Chrome did not expose this tab URL. Reload CTX from chrome://extensions.");
+    if (!isSupportedPage(tabUrl)) return false;
 
     try {
       const response = await chrome.tabs.sendMessage(tab.id, { type: "ctx:ping-content" });
@@ -33,11 +36,23 @@ export function Popup() {
       // The content script may not be attached to this already-open tab yet.
     }
 
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"]
-    });
-    const response = await chrome.tabs.sendMessage(tab.id, { type: "ctx:ping-content" });
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content.js"]
+      });
+    } catch (error) {
+      throw new Error(`Chrome blocked CTX injection. ${formatError(error)} ${siteAccessHint(tabUrl)}`);
+    }
+
+    await wait(150);
+
+    let response: { ok?: boolean } | undefined;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { type: "ctx:ping-content" });
+    } catch (error) {
+      throw new Error(`CTX injected, but the page did not answer. ${formatError(error)} Refresh ChatGPT and try again.`);
+    }
     return Boolean(response?.ok);
   }
 
@@ -48,8 +63,8 @@ export function Popup() {
       await ensureContentScript();
       const response = await chrome.tabs.sendMessage(tab.id, { type });
       setMessage(response?.ok ? "Captured into CTX." : response?.error ?? "Action failed.");
-    } catch {
-      setMessage("Reload this AI page once after installing or updating CTX.");
+    } catch (error) {
+      setMessage(formatError(error));
     }
   }
 
@@ -66,8 +81,8 @@ export function Popup() {
     try {
       const injected = await ensureContentScript();
       setMessage(injected ? "CTX button injected. Check near the prompt box." : "Open ChatGPT, Claude, Gemini, Perplexity, or GitHub first.");
-    } catch {
-      setMessage("Could not inject here. Refresh the AI page, then click Show CTX Button again.");
+    } catch (error) {
+      setMessage(formatError(error));
     }
   }
 
@@ -93,6 +108,19 @@ export function Popup() {
       {message ? <p className="message" aria-live="polite">{message}</p> : null}
     </main>
   );
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function formatError(error: unknown) {
+  return error instanceof Error ? error.message : "Could not inject CTX on this page.";
+}
+
+function siteAccessHint(url: string) {
+  if (!url.startsWith("https://")) return "";
+  return "Open chrome://extensions > CTX Details > Site access, then choose On all sites or add this site.";
 }
 
 function isSupportedPage(url: string) {
