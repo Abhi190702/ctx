@@ -25,8 +25,8 @@ export function AppSidebar() {
   return (
     <aside className="hidden w-72 shrink-0 border-r border-line bg-panel/80 p-4 backdrop-blur-xl lg:block">
       <Link href="/" className="mb-6 flex items-center gap-3 rounded-xl px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint">
-        <span className="grid h-10 w-10 place-items-center rounded-xl border border-mint/30 bg-mint/10 text-sm font-bold text-mint">
-          CTX
+        <span className="grid h-10 w-10 place-items-center rounded-xl border border-mint/30 bg-foreground p-1.5 shadow-sm shadow-mint/10">
+          <img src="/icon-192.png" alt="" aria-hidden="true" className="h-full w-full object-contain" />
         </span>
         <span>
           <span className="block text-sm font-semibold text-foreground">CTX</span>

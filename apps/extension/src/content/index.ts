@@ -119,23 +119,31 @@ function mountCtxButton() {
   window.addEventListener("scroll", () => placeButton(host), { passive: true });
 
   const root = host.attachShadow({ mode: "open" });
+  const markUrl = chrome.runtime.getURL("assets/ctx-mark.png");
   root.innerHTML = `
     <style>
       :host { all: initial; color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       .wrap { position: relative; display: flex; align-items: flex-end; gap: 10px; }
       .launcher {
-        width: 44px;
-        height: 44px;
-        border: 1px solid rgba(15,118,110,.42);
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid rgba(139,245,207,.58);
         border-radius: 999px;
-        background: linear-gradient(135deg, #ccfbf1, #2dd4bf);
-        color: #052e2b;
-        font: 900 12px ui-sans-serif, system-ui, sans-serif;
+        background: radial-gradient(circle at 35% 22%, rgba(139,245,207,.20), rgba(5,8,18,.96) 58%);
         cursor: pointer;
-        box-shadow: 0 12px 36px rgba(0,0,0,.35);
+        box-shadow: 0 14px 40px rgba(0,0,0,.42), 0 0 0 4px rgba(139,245,207,.08);
       }
       .launcher:hover { filter: brightness(1.04); transform: translateY(-1px); }
       .launcher:focus-visible, .menu button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+      .launcher img {
+        width: 35px;
+        height: 35px;
+        display: block;
+        object-fit: contain;
+      }
       .menu {
         position: absolute;
         right: 54px;
@@ -195,7 +203,9 @@ function mountCtxButton() {
         <button type="button" class="open"><span class="icon">o</span><span>Open CTX</span></button>
         <p class="status">Local CTX memory</p>
       </section>
-      <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">CTX</button>
+      <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">
+        <img src="${markUrl}" alt="" />
+      </button>
       <div class="toast" role="status" aria-live="polite"></div>
     </div>
   `;

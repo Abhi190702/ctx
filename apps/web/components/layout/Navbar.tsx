@@ -14,8 +14,8 @@ export function Navbar() {
     <header className="sticky top-0 z-20 w-full max-w-[100vw] overflow-hidden border-b border-line bg-panel/80 px-4 py-3 backdrop-blur-xl sm:px-6 md:px-10">
       <div className="flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 font-semibold text-foreground lg:hidden">
-          <span className="grid h-8 w-8 place-items-center rounded-xl border border-mint/40 bg-mint/10 text-xs text-mint">
-            CTX
+          <span className="grid h-8 w-8 place-items-center rounded-xl border border-mint/40 bg-foreground p-1 shadow-sm shadow-mint/10">
+            <img src="/icon-192.png" alt="" aria-hidden="true" className="h-full w-full object-contain" />
           </span>
           CTX
         </Link>

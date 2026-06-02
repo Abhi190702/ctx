@@ -7,6 +7,7 @@ export function Popup() {
   const [apiUrl, setApiUrl] = useState("http://localhost:3000/api");
   const [capsules, setCapsules] = useState<Capsule[]>([]);
   const [message, setMessage] = useState("");
+  const logoUrl = chrome.runtime.getURL("assets/ctx-mark.png");
 
   useEffect(() => {
     getSettings().then((settings) => setApiUrl(settings.apiUrl));
@@ -89,8 +90,13 @@ export function Popup() {
   return (
     <main>
       <header>
-        <strong>CTX</strong>
-        <span>Portable memory for AI workflows</span>
+        <span className="brand-mark" aria-hidden="true">
+          <img src={logoUrl} alt="" />
+        </span>
+        <span>
+          <strong>CTX</strong>
+          <span>Portable memory for AI workflows</span>
+        </span>
       </header>
       <section className="actions" aria-label="Actions">
         <button type="button" onClick={showButton}>Show CTX Button</button>
