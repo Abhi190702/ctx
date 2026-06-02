@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -10,7 +10,7 @@ export default defineConfig({
       closeBundle() {
         mkdirSync("dist/assets", { recursive: true });
         copyFileSync("manifest.json", "dist/manifest.json");
-        copyFileSync("assets/icon.svg", "dist/assets/icon.svg");
+        cpSync("assets", "dist/assets", { recursive: true });
       }
     }
   ],

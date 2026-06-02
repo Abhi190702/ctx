@@ -19,12 +19,33 @@ export function Popup() {
         setCapsules([]);
         setMessage("CTX app is not reachable. Start pnpm dev and keep this URL as /api.");
       });
+    ensureContentScript().catch(() => undefined);
   }, []);
+
+  async function ensureContentScript() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab.id || !tab.url || !isSupportedPage(tab.url)) return false;
+
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: "ctx:ping-content" });
+      if (response?.ok) return true;
+    } catch {
+      // The content script may not be attached to this already-open tab yet.
+    }
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"]
+    });
+    const response = await chrome.tabs.sendMessage(tab.id, { type: "ctx:ping-content" });
+    return Boolean(response?.ok);
+  }
 
   async function send(type: string) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) return;
+      await ensureContentScript();
       const response = await chrome.tabs.sendMessage(tab.id, { type });
       setMessage(response?.ok ? "Captured into CTX." : response?.error ?? "Action failed.");
     } catch {
@@ -41,6 +62,15 @@ export function Popup() {
     await chrome.tabs.create({ url: await getCtxPageUrl(path) });
   }
 
+  async function showButton() {
+    try {
+      const injected = await ensureContentScript();
+      setMessage(injected ? "CTX button injected. Check near the prompt box." : "Open ChatGPT, Claude, Gemini, Perplexity, or GitHub first.");
+    } catch {
+      setMessage("Could not inject here. Refresh the AI page, then click Show CTX Button again.");
+    }
+  }
+
   return (
     <main>
       <header>
@@ -48,6 +78,7 @@ export function Popup() {
         <span>Portable memory for AI workflows</span>
       </header>
       <section className="actions" aria-label="Actions">
+        <button type="button" onClick={showButton}>Show CTX Button</button>
         <button type="button" onClick={() => send("ctx:capture-selection")}>Capture Selection</button>
         <button type="button" onClick={() => send("ctx:capture-page")}>Capture Page</button>
         <button type="button" onClick={() => openCtx()}>Open Dashboard</button>
@@ -62,4 +93,15 @@ export function Popup() {
       {message ? <p className="message" aria-live="polite">{message}</p> : null}
     </main>
   );
+}
+
+function isSupportedPage(url: string) {
+  return [
+    "https://chatgpt.com/",
+    "https://chat.openai.com/",
+    "https://claude.ai/",
+    "https://gemini.google.com/",
+    "https://www.perplexity.ai/",
+    "https://github.com/"
+  ].some((prefix) => url.startsWith(prefix));
 }

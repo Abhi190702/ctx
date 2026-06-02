@@ -36,7 +36,10 @@ If the popup opens but no CTX button appears on an AI page:
 2. Confirm the popup API URL is `http://localhost:3000/api`.
 3. Reload CTX from `chrome://extensions`.
 4. Refresh the AI page once.
-5. Open the page console and look for content script errors if the button still does not appear.
+5. Open the CTX popup and click `Show CTX Button`.
+6. Open the page console and look for content script errors if the button still does not appear.
+
+The `Errors` button on `chrome://extensions` can show old errors from a previous build. After reloading CTX, open `Errors`, clear the old entries, then test again.
 
 ## Release Packaging
 

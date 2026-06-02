@@ -22,10 +22,10 @@
     "default_title": "CTX",
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "assets/icon.svg",
-      "32": "assets/icon.svg",
-      "48": "assets/icon.svg",
-      "128": "assets/icon.svg"
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
     }
   },
   "options_page": "options.html",
@@ -44,9 +44,9 @@
     }
   ],
   "icons": {
-    "16": "assets/icon.svg",
-    "32": "assets/icon.svg",
-    "48": "assets/icon.svg",
-    "128": "assets/icon.svg"
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
   }
 }

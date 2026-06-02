@@ -27,6 +27,11 @@ const observer = new MutationObserver(() => mountCtxButton());
 observer.observe(document.documentElement, { childList: true, subtree: true });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "ctx:ping-content") {
+    mountCtxButton();
+    sendResponse({ ok: true });
+    return false;
+  }
   if (message?.type === "ctx:capture-selection") {
     captureSelection().then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -52,6 +57,13 @@ function detectPlatform(host = location.hostname): Platform {
 function mountCtxButton() {
   if (buttonHost?.isConnected) {
     placeButton(buttonHost);
+    return;
+  }
+
+  const existingHost = document.querySelector<HTMLElement>("[data-ctx-extension='launcher']");
+  if (existingHost?.isConnected) {
+    buttonHost = existingHost;
+    placeButton(existingHost);
     return;
   }
 
@@ -140,8 +152,8 @@ function mountCtxButton() {
     <div class="wrap">
       <section class="menu" aria-label="CTX actions">
         <button type="button" class="generate"><span class="icon">+</span><span>Generate Capsule</span></button>
-        <button type="button" class="drop"><span class="icon">↵</span><span>Drop Capsule</span></button>
-        <button type="button" class="open"><span class="icon">⌂</span><span>Open CTX</span></button>
+        <button type="button" class="drop"><span class="icon">v</span><span>Drop Capsule</span></button>
+        <button type="button" class="open"><span class="icon">o</span><span>Open CTX</span></button>
         <p class="status">Local CTX memory</p>
       </section>
       <button type="button" class="launcher" title="CTX memory" aria-label="CTX memory">CTX</button>
