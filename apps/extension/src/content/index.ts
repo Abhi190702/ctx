@@ -17,6 +17,8 @@ type Capsule = {
 
 type DropMode = "smart" | "brief" | "full";
 
+const launcherSize = 34;
+const launcherGap = 9;
 let buttonHost: HTMLElement | null = null;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
@@ -31,8 +33,24 @@ const promptSelectors: Record<Platform, string[]> = {
     "div[role='textbox'][contenteditable='true']",
     "textarea"
   ],
-  claude: ["div[contenteditable='true']", "div[role='textbox']", "textarea"],
-  gemini: ["rich-textarea div[contenteditable='true']", "div[role='textbox']", "textarea", "[contenteditable='true']"],
+  claude: [
+    "[data-testid*='chat-input']",
+    "[aria-label*='prompt' i]",
+    "[aria-label*='message' i]",
+    "div[contenteditable='true']",
+    "div[role='textbox']",
+    "textarea"
+  ],
+  gemini: [
+    "rich-textarea div[contenteditable='true']",
+    "rich-textarea",
+    ".ql-editor",
+    "[aria-label*='prompt' i]",
+    "[aria-label*='message' i]",
+    "div[role='textbox']",
+    "textarea",
+    "[contenteditable='true']"
+  ],
   perplexity: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
   github: ["textarea[name='comment[body]']", "textarea", "[contenteditable='true']"],
   cursor: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
@@ -109,8 +127,10 @@ function mountCtxButton() {
   const host = document.createElement("div");
   host.dataset.ctxExtension = "launcher";
   host.style.position = "fixed";
-  host.style.right = "20px";
-  host.style.bottom = "86px";
+  host.style.left = `${window.innerWidth - launcherSize - 20}px`;
+  host.style.top = `${window.innerHeight - launcherSize - 84}px`;
+  host.style.width = `${launcherSize}px`;
+  host.style.height = `${launcherSize}px`;
   host.style.zIndex = "2147483647";
   document.documentElement.append(host);
   buttonHost = host;
@@ -125,8 +145,8 @@ function mountCtxButton() {
       :host { all: initial; color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       .wrap { position: relative; display: flex; align-items: flex-end; gap: 10px; }
       .launcher {
-        width: 38px;
-        height: 38px;
+        width: 34px;
+        height: 34px;
         display: grid;
         place-items: center;
         overflow: hidden;
@@ -134,19 +154,19 @@ function mountCtxButton() {
         border-radius: 999px;
         background: radial-gradient(circle at 35% 22%, rgba(139,245,207,.20), rgba(5,8,18,.96) 58%);
         cursor: pointer;
-        box-shadow: 0 10px 28px rgba(0,0,0,.34), 0 0 0 3px rgba(139,245,207,.07);
+        box-shadow: 0 8px 22px rgba(0,0,0,.30), 0 0 0 2px rgba(139,245,207,.07);
         transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease;
       }
       .launcher:hover {
         border-color: rgba(139,245,207,.80);
         filter: brightness(1.05);
         transform: translateY(-1px);
-        box-shadow: 0 12px 32px rgba(0,0,0,.38), 0 0 0 4px rgba(139,245,207,.10);
+        box-shadow: 0 10px 28px rgba(0,0,0,.36), 0 0 0 3px rgba(139,245,207,.10);
       }
       .launcher:focus-visible, .menu button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
       .launcher img {
-        width: 27px;
-        height: 27px;
+        width: 24px;
+        height: 24px;
         display: block;
         object-fit: contain;
       }
@@ -160,14 +180,14 @@ function mountCtxButton() {
       .menu {
         position: absolute;
         right: 0;
-        bottom: 48px;
-        width: 224px;
+        bottom: 42px;
+        width: 216px;
         display: none;
         overflow: hidden;
         border: 1px solid #283044;
-        border-radius: 16px;
+        border-radius: 14px;
         background: rgba(17,24,39,.96);
-        box-shadow: 0 22px 76px rgba(0,0,0,.50);
+        box-shadow: 0 18px 62px rgba(0,0,0,.48);
         backdrop-filter: blur(14px);
       }
       .menu[data-open="true"] { display: block; }
@@ -175,19 +195,19 @@ function mountCtxButton() {
         width: 100%;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 9px;
         border: 0;
         background: transparent;
         color: #e5e7eb;
-        padding: 12px 14px;
+        padding: 11px 13px;
         text-align: left;
-        font: 760 13px/1.25 ui-sans-serif, system-ui, sans-serif;
+        font: 740 13px/1.25 ui-sans-serif, system-ui, sans-serif;
         cursor: pointer;
       }
       .menu button:hover { background: rgba(255,255,255,.06); }
       .icon {
-        width: 22px;
-        height: 22px;
+        width: 21px;
+        height: 21px;
         display: grid;
         flex: 0 0 auto;
         place-items: center;
@@ -206,7 +226,7 @@ function mountCtxButton() {
       }
       .status {
         margin: 0;
-        padding: 10px 14px 12px;
+        padding: 9px 13px 11px;
         border-top: 1px solid #283044;
         color: #9ca3af;
         font: 650 11px/1.4 ui-sans-serif, system-ui, sans-serif;
@@ -214,7 +234,7 @@ function mountCtxButton() {
       .toast {
         position: absolute;
         right: 0;
-        bottom: 48px;
+        bottom: 42px;
         min-width: 210px;
         max-width: 300px;
         display: none;
@@ -292,15 +312,18 @@ function mountCtxButton() {
 }
 
 function placeButton(host: HTMLElement) {
-  const prompt = findPrompt(detectPlatform());
-  const rect = prompt?.getBoundingClientRect();
-  if (!rect || rect.width < 120 || rect.height < 24) {
-    host.style.right = "20px";
-    host.style.bottom = "84px";
-    return;
-  }
-  host.style.right = `${Math.max(14, window.innerWidth - rect.right + 12)}px`;
-  host.style.bottom = `${Math.max(16, window.innerHeight - rect.bottom + 14)}px`;
+  const platform = detectPlatform();
+  const prompt = findPrompt(platform);
+  const composer = findComposer(platform, prompt);
+  const anchor = composer ? findActionAnchor(composer, platform) : null;
+  const position = anchor ?? fallbackPosition();
+
+  host.style.left = `${Math.round(position.left)}px`;
+  host.style.top = `${Math.round(position.top)}px`;
+  host.style.right = "auto";
+  host.style.bottom = "auto";
+  host.style.width = `${launcherSize}px`;
+  host.style.height = `${launcherSize}px`;
 }
 
 function plusIcon() {
@@ -337,6 +360,143 @@ function findPrompt(platform: Platform): HTMLElement | null {
     const br = b.getBoundingClientRect();
     return br.bottom - ar.bottom || br.width * br.height - ar.width * ar.height;
   })[0] ?? null;
+}
+
+function findComposer(platform: Platform, prompt: HTMLElement | null): DOMRect | null {
+  if (prompt) {
+    const promptRect = prompt.getBoundingClientRect();
+    let node: HTMLElement | null = prompt;
+    for (let depth = 0; node && depth < 10; depth++) {
+      const rect = node.getBoundingClientRect();
+      if (isComposerRect(rect, promptRect)) return rect;
+      node = node.parentElement;
+    }
+  }
+
+  return findComposerBySelector(platform);
+}
+
+function findComposerBySelector(platform: Platform): DOMRect | null {
+  const selectors: Record<Platform, string[]> = {
+    chatgpt: [
+      "form[data-type='unified-composer']",
+      "[data-testid='composer']",
+      "[data-testid='composer-footer-actions']",
+      "form"
+    ],
+    claude: [
+      "[data-testid*='composer']",
+      "[data-testid*='chat-input']",
+      "fieldset",
+      "form"
+    ],
+    gemini: [
+      "rich-textarea",
+      "[data-test-id*='input']",
+      "[data-testid*='input']",
+      "form"
+    ],
+    perplexity: ["form", "[data-testid*='input']"],
+    github: ["form", "textarea"],
+    cursor: ["form", "textarea"],
+    generic: ["form", "textarea", "[contenteditable='true']"]
+  };
+
+  const candidates: DOMRect[] = [];
+  for (const selector of [...(selectors[platform] ?? []), ...selectors.generic]) {
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
+      const rect = element.getBoundingClientRect();
+      if (isVisibleRect(rect) && rect.width > 220 && rect.height >= 40 && rect.height <= 240) candidates.push(rect);
+    }
+  }
+
+  return candidates.sort((a, b) => {
+    const bottomScore = b.bottom - a.bottom;
+    if (Math.abs(bottomScore) > 20) return bottomScore;
+    return b.width * b.height - a.width * a.height;
+  })[0] ?? null;
+}
+
+function isComposerRect(rect: DOMRect, promptRect: DOMRect) {
+  return (
+    isVisibleRect(rect) &&
+    rect.width >= Math.max(220, promptRect.width + 80) &&
+    rect.height >= 44 &&
+    rect.height <= 240 &&
+    rect.bottom >= promptRect.bottom - 16 &&
+    rect.top <= promptRect.top + 24
+  );
+}
+
+function isVisibleRect(rect: DOMRect) {
+  return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+}
+
+function findActionAnchor(composer: DOMRect, platform: Platform) {
+  const controls = findComposerControls(composer, platform);
+  const firstRightControl = controls[0];
+  const centerY = firstRightControl ? verticalCenter(firstRightControl) : composer.bottom - Math.min(30, composer.height / 2);
+  const centerX = firstRightControl ? firstRightControl.left - launcherGap - launcherSize / 2 : composer.right - fallbackInsetForPlatform(platform);
+  const left = clamp(centerX - launcherSize / 2, composer.left + 12, composer.right - launcherSize - 12);
+  const top = clamp(centerY - launcherSize / 2, composer.top + 8, composer.bottom - launcherSize - 8);
+  return { left, top };
+}
+
+function findComposerControls(composer: DOMRect, platform: Platform) {
+  const threshold = composer.left + composer.width * rightControlThreshold(platform);
+  const controls = Array.from(document.querySelectorAll<HTMLElement>("button,[role='button'],select"))
+    .map((element) => element.getBoundingClientRect())
+    .filter((rect) => {
+      const centerX = horizontalCenter(rect);
+      const centerY = verticalCenter(rect);
+      return (
+        isVisibleRect(rect) &&
+        rect.width >= 18 &&
+        rect.height >= 18 &&
+        rect.width <= 96 &&
+        rect.height <= 96 &&
+        centerX >= threshold &&
+        centerX >= composer.left &&
+        centerX <= composer.right &&
+        centerY >= composer.top &&
+        centerY <= composer.bottom
+      );
+    })
+    .sort((a, b) => a.left - b.left);
+
+  return controls;
+}
+
+function rightControlThreshold(platform: Platform) {
+  if (platform === "gemini") return 0.46;
+  if (platform === "claude") return 0.56;
+  return 0.52;
+}
+
+function fallbackInsetForPlatform(platform: Platform) {
+  if (platform === "chatgpt") return 142;
+  if (platform === "gemini") return 142;
+  if (platform === "claude") return 150;
+  return 118;
+}
+
+function fallbackPosition() {
+  return {
+    left: Math.max(16, window.innerWidth - launcherSize - 22),
+    top: Math.max(16, window.innerHeight - launcherSize - 92)
+  };
+}
+
+function horizontalCenter(rect: DOMRect) {
+  return rect.left + rect.width / 2;
+}
+
+function verticalCenter(rect: DOMRect) {
+  return rect.top + rect.height / 2;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 async function pingCtx(): Promise<boolean> {
