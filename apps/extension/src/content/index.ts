@@ -49,10 +49,14 @@ const CTX_BUTTON_ID = "ctx-patchpilot-btn";
 const CTX_SHELL_ID = "ctx-patchpilot-shell";
 const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
 const defaultLauncherSize = 26;
+const defaultWelcomeMessage = "Your AI needs context";
 let injectionObserver: MutationObserver | null = null;
 let fallbackTimer: number | null = null;
 let retryTimer: number | null = null;
+let quickRetryTimer: number | null = null;
 let retryAttempts = 0;
+let quickRetryAttempts = 0;
+let mountAttemptFrame = 0;
 let lastUrl = location.href;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
@@ -340,15 +344,39 @@ function startInjectionWatcher() {
 
   injectionObserver?.disconnect();
   injectionObserver = new MutationObserver(() => {
-    if (safeMountCtxButton()) stopInjectionWatcher();
+    scheduleMountAttempt();
   });
   injectionObserver.observe(document.body, { childList: true, subtree: true });
+  scheduleMountAttempt();
+  startQuickRetryLoop();
 
   if (fallbackTimer) window.clearTimeout(fallbackTimer);
   fallbackTimer = window.setTimeout(() => {
     fallbackTimer = null;
     if (!document.getElementById(CTX_BUTTON_ID)) startRetryLoop();
-  }, 5000);
+  }, 3500);
+}
+
+function scheduleMountAttempt() {
+  if (mountAttemptFrame) return;
+  mountAttemptFrame = window.requestAnimationFrame(() => {
+    mountAttemptFrame = 0;
+    if (safeMountCtxButton()) stopInjectionWatcher();
+  });
+}
+
+function startQuickRetryLoop() {
+  if (quickRetryTimer) return;
+  quickRetryAttempts = 0;
+  quickRetryTimer = window.setInterval(() => {
+    quickRetryAttempts += 1;
+    if (safeMountCtxButton() || quickRetryAttempts >= 24) {
+      if (quickRetryTimer) {
+        window.clearInterval(quickRetryTimer);
+        quickRetryTimer = null;
+      }
+    }
+  }, 140);
 }
 
 function startRetryLoop() {
@@ -363,15 +391,24 @@ function startRetryLoop() {
 function stopInjectionWatcher() {
   injectionObserver?.disconnect();
   injectionObserver = null;
+  if (mountAttemptFrame) {
+    window.cancelAnimationFrame(mountAttemptFrame);
+    mountAttemptFrame = 0;
+  }
   if (fallbackTimer) {
     window.clearTimeout(fallbackTimer);
     fallbackTimer = null;
+  }
+  if (quickRetryTimer) {
+    window.clearInterval(quickRetryTimer);
+    quickRetryTimer = null;
   }
   if (retryTimer) {
     window.clearInterval(retryTimer);
     retryTimer = null;
   }
   retryAttempts = 0;
+  quickRetryAttempts = 0;
 }
 
 function detectPlatform(host = location.hostname): Platform {
@@ -448,6 +485,9 @@ function createLauncherShell(refElement: HTMLElement) {
       #${CTX_SHELL_ID}[data-platform="deepseek"] {
         margin: 0 7px !important;
       }
+      #${CTX_SHELL_ID}[data-welcome-hidden="true"] .welcome {
+        display: none !important;
+      }
       #${CTX_BUTTON_ID} {
         all: unset;
         position: static !important;
@@ -498,6 +538,49 @@ function createLauncherShell(refElement: HTMLElement) {
       }
       #${CTX_BUTTON_ID}.fallback img { display: none; }
       #${CTX_BUTTON_ID}.fallback .fallback-label { display: block; }
+      #${CTX_SHELL_ID} .welcome {
+        position: absolute;
+        right: -5px;
+        bottom: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 10px);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: min(260px, calc(100vw - 32px));
+        white-space: nowrap;
+        border: 1px solid rgba(139,92,246,.82);
+        border-radius: 999px;
+        background: rgba(17,24,39,.98);
+        color: #e5e7eb;
+        padding: 7px 11px;
+        font: 800 12px/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: 0;
+        box-shadow: 0 14px 44px rgba(0,0,0,.38), inset 0 0 0 1px rgba(255,255,255,.04);
+        pointer-events: none;
+        z-index: 2147483647;
+        opacity: 0;
+        transform: translateY(4px);
+        animation: ctxWelcome 5200ms ease both;
+      }
+      #${CTX_SHELL_ID}:hover .welcome {
+        opacity: 1;
+        transform: translateY(0);
+        animation: none;
+      }
+      #${CTX_SHELL_ID} .welcome-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${CTX_SHELL_ID} .welcome-dots {
+        color: #a78bfa;
+        font-weight: 900;
+        letter-spacing: 2px;
+      }
+      @keyframes ctxWelcome {
+        0% { opacity: 0; transform: translateY(4px) scale(.98); }
+        12% { opacity: 1; transform: translateY(0) scale(1); }
+        78% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(3px) scale(.98); }
+      }
       #${CTX_SHELL_ID} .menu {
         position: absolute;
         right: 0;
@@ -583,6 +666,10 @@ function createLauncherShell(refElement: HTMLElement) {
       <img src="${markUrl}" alt="" />
       <span class="fallback-label">CTX</span>
     </button>
+    <span class="welcome" aria-hidden="true">
+      <span class="welcome-text"></span>
+      <span class="welcome-dots">•••</span>
+    </span>
     <section class="menu" aria-label="CTX actions">
       <button type="button" class="generate"><span class="icon">${plusIcon()}</span><span>Generate Capsule</span></button>
       <button type="button" class="drop"><span class="icon">${dropIcon()}</span><span>Drop Capsule</span></button>
@@ -599,6 +686,7 @@ function createLauncherShell(refElement: HTMLElement) {
   const logo = shell.querySelector(`#${CTX_BUTTON_ID} img`) as HTMLImageElement;
 
   syncLauncherMetrics(shell, launcher, refElement);
+  void applyWelcomeMessage(shell);
 
   logo.addEventListener("error", () => launcher.classList.add("fallback"));
   logo.addEventListener("load", () => launcher.classList.remove("fallback"));
@@ -928,6 +1016,24 @@ function syncLauncherMetrics(shell: HTMLElement, button: HTMLButtonElement, refE
   shell.style.setProperty("--ctx-toolbar-button-size", `${size}px`);
   shell.style.setProperty("--ctx-toolbar-button-radius", refStyle.borderRadius && refStyle.borderRadius !== "0px" ? refStyle.borderRadius : "999px");
   button.style.height = `${size}px`;
+}
+
+async function applyWelcomeMessage(shell: HTMLElement) {
+  const text = shell.querySelector<HTMLElement>(".welcome-text");
+  if (!text) return;
+
+  try {
+    const settings = await chrome.storage.local.get({ welcomeMessage: defaultWelcomeMessage });
+    const message = String(settings.welcomeMessage || defaultWelcomeMessage).trim().slice(0, 44);
+    if (!message) {
+      shell.dataset.welcomeHidden = "true";
+      return;
+    }
+    delete shell.dataset.welcomeHidden;
+    text.textContent = message;
+  } catch {
+    text.textContent = defaultWelcomeMessage;
+  }
 }
 
 function cleanupLegacyLaunchers() {

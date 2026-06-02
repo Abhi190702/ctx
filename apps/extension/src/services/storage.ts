@@ -1,7 +1,8 @@
 import type { ExtensionSettings } from "../types";
 
 const defaults: ExtensionSettings = {
-  apiUrl: "http://localhost:3000/api"
+  apiUrl: "http://localhost:3000/api",
+  welcomeMessage: "Your AI needs context"
 };
 
 export async function getSettings(): Promise<ExtensionSettings> {
