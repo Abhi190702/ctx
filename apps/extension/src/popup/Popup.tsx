@@ -81,7 +81,7 @@ export function Popup() {
   async function showButton() {
     try {
       const injected = await ensureContentScript();
-      setMessage(injected ? "CTX button injected. Check near the prompt box." : "Open ChatGPT, Claude, Gemini, Perplexity, or GitHub first.");
+      setMessage(injected ? "CTX button injected. Check near the prompt box." : "Open a supported AI chat page first.");
     } catch (error) {
       setMessage(formatError(error));
     }
@@ -147,6 +147,7 @@ function isSupportedPage(url: string) {
       "copilot.microsoft.com",
       "www.meta.ai",
       "chat.qwen.ai",
+      "qwen.ai",
       "lovable.dev",
       "replit.com",
       "app.emergent.sh",
@@ -155,7 +156,7 @@ function isSupportedPage(url: string) {
       "cursor.com",
       "github.com"
     ]);
-    return exactHosts.has(host) || host.endsWith(".copilot.microsoft.com") || host.endsWith(".lovable.dev");
+    return exactHosts.has(host) || host.endsWith(".copilot.microsoft.com") || host.endsWith(".lovable.dev") || host.endsWith(".qwen.ai");
   } catch {
     return false;
   }

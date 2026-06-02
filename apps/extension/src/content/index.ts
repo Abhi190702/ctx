@@ -184,6 +184,8 @@ const PLATFORM_CONFIG: Record<string, PlatformToolbarConfig> = {
   "copilot.microsoft.com": genericToolbarConfig,
   "www.meta.ai": genericToolbarConfig,
   "chat.qwen.ai": genericToolbarConfig,
+  "qwen.ai": genericToolbarConfig,
+  "www.qwen.ai": genericToolbarConfig,
   "lovable.dev": genericToolbarConfig,
   "app.emergent.sh": genericToolbarConfig,
   "v0.dev": genericToolbarConfig,
@@ -387,7 +389,7 @@ function detectPlatform(host = location.hostname): Platform {
   if (normalized.includes("poe.com")) return "poe";
   if (normalized.includes("chat.mistral.ai")) return "mistral";
   if (normalized.includes("www.meta.ai")) return "meta";
-  if (normalized.includes("chat.qwen.ai")) return "qwen";
+  if (normalized.includes("qwen.ai")) return "qwen";
   if (normalized.includes("lovable.dev")) return "lovable";
   if (normalized.includes("replit.com")) return "replit";
   if (normalized.includes("app.emergent.sh")) return "emergent";
@@ -685,7 +687,13 @@ type ToolbarSlot = {
 
 function findToolbarSlot(): ToolbarSlot | null {
   const config = getToolbarConfig();
-  return findSlotFromReferences(config) ?? findSlotFromToolbars(config) ?? findSlotFromReferences(genericToolbarConfig) ?? findSlotFromToolbars(genericToolbarConfig);
+  return (
+    findSlotFromReferences(config) ??
+    findSlotFromToolbars(config) ??
+    findSlotFromComposerControls(detectPlatform()) ??
+    findSlotFromReferences(genericToolbarConfig) ??
+    findSlotFromToolbars(genericToolbarConfig)
+  );
 }
 
 function getToolbarConfig(host = location.hostname) {
@@ -739,6 +747,104 @@ function findToolbarForReference(refElement: HTMLElement, config: PlatformToolba
     node = node.parentElement;
   }
   return refElement.parentElement;
+}
+
+function findSlotFromComposerControls(platform: Platform): ToolbarSlot | null {
+  const prompt = findPrompt(platform);
+  if (!prompt) return null;
+
+  const composer = findComposerElement(prompt);
+  if (!composer) return null;
+
+  const promptRect = prompt.getBoundingClientRect();
+  const composerRect = composer.getBoundingClientRect();
+  const controls = queryVisibleElements("button,[role='button'],select,voice-input-toggle", composer)
+    .filter((control) => !isInsideCtxLauncher(control) && !isEditableControl(control))
+    .filter((control) => {
+      const rect = control.getBoundingClientRect();
+      return (
+        rect.width >= 18 &&
+        rect.height >= 18 &&
+        rect.width <= 180 &&
+        rect.height <= 80 &&
+        rect.bottom >= promptRect.top &&
+        rect.top <= composerRect.bottom &&
+        rect.left >= composerRect.left - 4 &&
+        rect.right <= composerRect.right + 4
+      );
+    });
+
+  const refElement = chooseComposerReference(controls, composerRect);
+  if (!refElement) return null;
+
+  return normalizeToolbarSlot(refElement.parentElement ?? composer, refElement, "before");
+}
+
+function findComposerElement(prompt: HTMLElement) {
+  const promptRect = prompt.getBoundingClientRect();
+  let node: HTMLElement | null = prompt;
+
+  for (let depth = 0; node && depth < 10; depth += 1) {
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    const hasControls = Boolean(node.querySelector("button,[role='button'],select,voice-input-toggle"));
+    const looksLikeComposer =
+      isVisibleRect(rect) &&
+      hasControls &&
+      rect.width >= Math.max(240, promptRect.width) &&
+      rect.height >= Math.max(44, promptRect.height) &&
+      rect.height <= 260 &&
+      rect.bottom >= promptRect.bottom - 4 &&
+      style.display !== "contents";
+
+    if (looksLikeComposer) return node;
+    node = node.parentElement;
+  }
+
+  return prompt.parentElement;
+}
+
+function chooseComposerReference(controls: HTMLElement[], composerRect: DOMRect) {
+  if (!controls.length) return null;
+
+  const maxBottom = Math.max(...controls.map((control) => control.getBoundingClientRect().bottom));
+  const bottomRow = controls.filter((control) => control.getBoundingClientRect().bottom >= maxBottom - 32);
+  const rightSide = bottomRow.filter((control) => {
+    const rect = control.getBoundingClientRect();
+    return rect.left >= composerRect.left + composerRect.width * 0.48;
+  });
+  const candidates = rightSide.length ? rightSide : bottomRow;
+
+  return candidates.sort((a, b) => {
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    const aLabel = controlText(a);
+    const bLabel = controlText(b);
+    return controlPriority(bLabel) - controlPriority(aLabel) || br.left - ar.left;
+  })[0] ?? null;
+}
+
+function controlText(element: HTMLElement) {
+  return [
+    element.getAttribute("aria-label"),
+    element.getAttribute("title"),
+    element.getAttribute("data-testid"),
+    element.textContent
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function controlPriority(label: string) {
+  if (/\b(microphone|mic|dictate|voice|audio)\b/.test(label)) return 6;
+  if (/\b(send|submit|arrow)\b/.test(label)) return 5;
+  if (/\b(upload|attach|file|paperclip|plus)\b/.test(label)) return 3;
+  return 1;
+}
+
+function isEditableControl(element: HTMLElement) {
+  return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element.isContentEditable || element.getAttribute("role") === "textbox";
 }
 
 function normalizeToolbarSlot(toolbar: HTMLElement, refElement: HTMLElement, insertPosition: InsertPosition): ToolbarSlot {
