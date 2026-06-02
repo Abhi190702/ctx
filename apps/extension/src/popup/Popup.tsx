@@ -130,12 +130,33 @@ function siteAccessHint(url: string) {
 }
 
 function isSupportedPage(url: string) {
-  return [
-    "https://chatgpt.com/",
-    "https://chat.openai.com/",
-    "https://claude.ai/",
-    "https://gemini.google.com/",
-    "https://www.perplexity.ai/",
-    "https://github.com/"
-  ].some((prefix) => url.startsWith(prefix));
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const exactHosts = new Set([
+      "chatgpt.com",
+      "chat.openai.com",
+      "claude.ai",
+      "gemini.google.com",
+      "notebooklm.google.com",
+      "www.perplexity.ai",
+      "perplexity.ai",
+      "chat.deepseek.com",
+      "grok.com",
+      "poe.com",
+      "chat.mistral.ai",
+      "copilot.microsoft.com",
+      "www.meta.ai",
+      "chat.qwen.ai",
+      "lovable.dev",
+      "replit.com",
+      "app.emergent.sh",
+      "v0.dev",
+      "bolt.new",
+      "cursor.com",
+      "github.com"
+    ]);
+    return exactHosts.has(host) || host.endsWith(".copilot.microsoft.com") || host.endsWith(".lovable.dev");
+  } catch {
+    return false;
+  }
 }

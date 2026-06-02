@@ -1,5 +1,25 @@
 (() => {
-type Platform = "chatgpt" | "claude" | "gemini" | "perplexity" | "github" | "cursor" | "generic";
+type Platform =
+  | "chatgpt"
+  | "claude"
+  | "gemini"
+  | "perplexity"
+  | "github"
+  | "cursor"
+  | "copilot"
+  | "deepseek"
+  | "grok"
+  | "poe"
+  | "mistral"
+  | "meta"
+  | "qwen"
+  | "lovable"
+  | "replit"
+  | "emergent"
+  | "v0"
+  | "bolt"
+  | "notebooklm"
+  | "generic";
 
 type Capsule = {
   id: string;
@@ -54,6 +74,19 @@ const promptSelectors: Record<Platform, string[]> = {
   perplexity: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
   github: ["textarea[name='comment[body]']", "textarea", "[contenteditable='true']"],
   cursor: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  copilot: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  deepseek: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  grok: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  poe: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  mistral: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  meta: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  qwen: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  lovable: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  replit: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  emergent: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  v0: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  bolt: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  notebooklm: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
   generic: ["textarea", "[contenteditable='true']", "div[role='textbox']"]
 };
 
@@ -105,9 +138,22 @@ function detectPlatform(host = location.hostname): Platform {
   if (normalized.includes("chatgpt.com") || normalized.includes("chat.openai.com")) return "chatgpt";
   if (normalized.includes("claude.ai")) return "claude";
   if (normalized.includes("gemini.google.com")) return "gemini";
+  if (normalized.includes("notebooklm.google.com")) return "notebooklm";
   if (normalized.includes("perplexity.ai")) return "perplexity";
   if (normalized.includes("github.com")) return "github";
   if (normalized.includes("cursor.com")) return "cursor";
+  if (normalized.includes("copilot.microsoft.com")) return "copilot";
+  if (normalized.includes("chat.deepseek.com")) return "deepseek";
+  if (normalized.includes("grok.com")) return "grok";
+  if (normalized.includes("poe.com")) return "poe";
+  if (normalized.includes("chat.mistral.ai")) return "mistral";
+  if (normalized.includes("www.meta.ai")) return "meta";
+  if (normalized.includes("chat.qwen.ai")) return "qwen";
+  if (normalized.includes("lovable.dev")) return "lovable";
+  if (normalized.includes("replit.com")) return "replit";
+  if (normalized.includes("app.emergent.sh")) return "emergent";
+  if (normalized.includes("v0.dev")) return "v0";
+  if (normalized.includes("bolt.new")) return "bolt";
   return "generic";
 }
 
@@ -393,12 +439,7 @@ function findComposerBySelector(platform: Platform): DOMRect | null {
       "[data-testid='composer-footer-actions']",
       "form"
     ],
-    claude: [
-      "[data-testid*='composer']",
-      "[data-testid*='chat-input']",
-      "fieldset",
-      "form"
-    ],
+    claude: ["[data-testid*='composer']", "[data-testid*='chat-input']", "fieldset", "form"],
     gemini: [
       "rich-textarea",
       "[data-test-id*='input']",
@@ -408,6 +449,19 @@ function findComposerBySelector(platform: Platform): DOMRect | null {
     perplexity: ["form", "[data-testid*='input']"],
     github: ["form", "textarea"],
     cursor: ["form", "textarea"],
+    copilot: ["form", "textarea", "[contenteditable='true']"],
+    deepseek: ["form", "textarea", "[contenteditable='true']"],
+    grok: ["form", "textarea", "[contenteditable='true']"],
+    poe: ["form", "textarea", "[contenteditable='true']"],
+    mistral: ["form", "textarea", "[contenteditable='true']"],
+    meta: ["form", "textarea", "[contenteditable='true']"],
+    qwen: ["form", "textarea", "[contenteditable='true']"],
+    lovable: ["form", "textarea", "[contenteditable='true']"],
+    replit: ["form", "textarea", "[contenteditable='true']"],
+    emergent: ["form", "textarea", "[contenteditable='true']"],
+    v0: ["form", "textarea", "[contenteditable='true']"],
+    bolt: ["form", "textarea", "[contenteditable='true']"],
+    notebooklm: ["form", "textarea", "[contenteditable='true']"],
     generic: ["form", "textarea", "[contenteditable='true']"]
   };
 
@@ -442,31 +496,34 @@ function isVisibleRect(rect: DOMRect) {
 }
 
 function findActionAnchor(composer: DOMRect, platform: Platform) {
-  if (platform === "claude") return findClaudeAnchor(composer);
-
   const controls = findComposerControls(composer, platform);
-  const firstRightControl = controls[0];
+  const voiceControl = findFirstVoiceControl(controls);
+  const modelControl = voiceControl ? findModelControlBefore(controls, voiceControl.rect) : null;
+  const firstRightControl = voiceControl?.rect ?? controls[0]?.rect;
   const centerY = firstRightControl ? verticalCenter(firstRightControl) : composer.bottom - Math.min(30, composer.height / 2);
-  const centerX = firstRightControl ? firstRightControl.left - launcherGap - launcherSize / 2 : composer.right - fallbackInsetForPlatform(platform);
+  const centerX =
+    modelControl && voiceControl
+      ? centerBetweenModelAndVoice(modelControl.rect, voiceControl.rect)
+      : firstRightControl
+        ? firstRightControl.left - launcherGap - launcherSize / 2
+        : composer.right - fallbackInsetForPlatform(platform);
   const left = clamp(centerX - launcherSize / 2, composer.left + 12, composer.right - launcherSize - 12);
   const top = clamp(centerY - launcherSize / 2, composer.top + 8, composer.bottom - launcherSize - 8);
-  return { left, top };
-}
-
-function findClaudeAnchor(composer: DOMRect) {
-  const topSpace = Math.max(8, Math.min(18, composer.height * 0.14));
-  const left = clamp(composer.right - launcherSize - 22, composer.left + 14, composer.right - launcherSize - 14);
-  const top = clamp(composer.top + topSpace, composer.top + 8, composer.bottom - launcherSize - 54);
   return { left, top };
 }
 
 function findComposerControls(composer: DOMRect, platform: Platform) {
   const threshold = composer.left + composer.width * rightControlThreshold(platform);
   const controls = Array.from(document.querySelectorAll<HTMLElement>("button,[role='button'],select"))
-    .map((element) => element.getBoundingClientRect())
-    .filter((rect) => {
+    .map((element) => ({
+      element,
+      rect: element.getBoundingClientRect(),
+      label: controlLabel(element)
+    }))
+    .filter(({ rect }) => {
       const centerX = horizontalCenter(rect);
       const centerY = verticalCenter(rect);
+      const bottomRowTop = composer.top + composer.height * bottomRowThreshold(platform);
       return (
         isVisibleRect(rect) &&
         rect.width >= 18 &&
@@ -476,13 +533,67 @@ function findComposerControls(composer: DOMRect, platform: Platform) {
         centerX >= threshold &&
         centerX >= composer.left &&
         centerX <= composer.right &&
-        centerY >= composer.top &&
+        centerY >= bottomRowTop &&
         centerY <= composer.bottom
       );
     })
-    .sort((a, b) => a.left - b.left);
+    .sort((a, b) => a.rect.left - b.rect.left);
 
   return controls;
+}
+
+type ControlCandidate = ReturnType<typeof findComposerControls>[number];
+
+function findFirstVoiceControl(controls: ControlCandidate[]) {
+  return controls.find((control) => isVoiceControl(control)) ?? controls.at(-1) ?? null;
+}
+
+function findModelControlBefore(controls: ControlCandidate[], voiceRect: DOMRect) {
+  const beforeVoice = controls.filter((control) => control.rect.right <= voiceRect.left + 6);
+  for (let index = beforeVoice.length - 1; index >= 0; index -= 1) {
+    const control = beforeVoice[index];
+    if (isModelControl(control)) return control;
+  }
+  return beforeVoice.at(-1) ?? null;
+}
+
+function centerBetweenModelAndVoice(modelRect: DOMRect, voiceRect: DOMRect) {
+  const gapCenter = (modelRect.right + voiceRect.left) / 2;
+  const minimumGap = launcherSize + launcherGap * 2;
+  if (voiceRect.left - modelRect.right >= minimumGap) return gapCenter;
+  return voiceRect.left - launcherGap - launcherSize / 2;
+}
+
+function isVoiceControl(control: ControlCandidate) {
+  const label = control.label;
+  if (/\b(mic|microphone|voice|audio|dictate|speak|send|submit|arrow)\b/.test(label)) return true;
+  const circular = Math.abs(control.rect.width - control.rect.height) <= 14;
+  return circular && control.rect.width <= 58;
+}
+
+function isModelControl(control: ControlCandidate) {
+  return /\b(pro|flash|sonnet|opus|haiku|gpt|model|low|medium|high|thinking|reasoning|auto)\b/.test(control.label);
+}
+
+function controlLabel(element: HTMLElement) {
+  return [
+    element.getAttribute("aria-label"),
+    element.getAttribute("title"),
+    element.getAttribute("data-testid"),
+    element.textContent
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function bottomRowThreshold(platform: Platform) {
+  if (platform === "chatgpt") return 0.32;
+  if (platform === "claude") return 0.50;
+  if (platform === "gemini") return 0.58;
+  return 0.42;
 }
 
 function rightControlThreshold(platform: Platform) {

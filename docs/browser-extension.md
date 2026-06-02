@@ -15,10 +15,26 @@ The CTX extension is a Manifest V3 foundation for capture and injection.
 - ChatGPT
 - Claude
 - Gemini
+- NotebookLM
 - Perplexity
+- DeepSeek
+- Grok
+- Poe
+- Mistral Le Chat
+- Microsoft Copilot
+- Meta AI
+- Qwen Chat
+- Lovable
+- Replit
+- Emergent
+- v0
+- Bolt
+- Cursor
 - GitHub
 
 The extension uses conservative selector arrays and safe fallbacks. If no prompt is found, it exits silently and does not break the host page.
+
+On AI chat surfaces, CTX tries to align the launcher in the composer action row between the model selector and microphone/voice/send controls.
 
 ## Development
 
@@ -28,7 +44,7 @@ pnpm extension:dev
 
 Load `apps/extension/dist` as an unpacked extension.
 
-After rebuilding the extension, Chrome does not automatically inject the new content script into tabs that are already open. Go to `chrome://extensions`, click the reload button on CTX, then refresh ChatGPT/Claude/Gemini/Perplexity/GitHub.
+After rebuilding the extension, Chrome does not automatically inject the new content script into tabs that are already open. Go to `chrome://extensions`, click the reload button on CTX, then refresh the AI page.
 
 If the popup opens but no CTX button appears on an AI page:
 
