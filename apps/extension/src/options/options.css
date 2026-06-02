@@ -21,6 +21,7 @@ form {
 }
 
 input,
+textarea,
 button {
   min-height: 40px;
   border: 1px solid #232a36;
@@ -31,6 +32,13 @@ button {
   padding: 0 12px;
 }
 
+textarea {
+  min-height: 124px;
+  padding: 10px 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
 button {
   width: max-content;
   background: #8bf5cf;
@@ -39,6 +47,7 @@ button {
 }
 
 input:focus-visible,
+textarea:focus-visible,
 button:focus-visible {
   outline: 2px solid #8bf5cf;
   outline-offset: 2px;

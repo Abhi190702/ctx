@@ -47,9 +47,18 @@ type PlatformToolbarConfig = {
 
 const CTX_BUTTON_ID = "ctx-patchpilot-btn";
 const CTX_SHELL_ID = "ctx-patchpilot-shell";
+const CTX_WELCOME_ID = "ctx-patchpilot-welcome";
 const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
 const defaultLauncherSize = 26;
-const defaultWelcomeMessage = "Your AI needs context";
+const defaultWelcomeMessages = [
+  "Your AI needs context",
+  "Drop memory before you prompt",
+  "Bring yesterday into this chat",
+  "Capture now, reuse later",
+  "Let CTX carry the context",
+  "Use a capsule, skip the recap",
+  "Keep the work moving"
+];
 let injectionObserver: MutationObserver | null = null;
 let fallbackTimer: number | null = null;
 let retryTimer: number | null = null;
@@ -59,6 +68,9 @@ let quickRetryAttempts = 0;
 let mountAttemptFrame = 0;
 let lastUrl = location.href;
 let picker: HTMLElement | null = null;
+let welcomeAnchor: HTMLElement | null = null;
+let welcomeHost: HTMLElement | null = null;
+let welcomeTimer: number | null = null;
 let menuOpen = false;
 const ctxWindow = window as Window & {
   __CTX_CONTENT_READY__?: boolean;
@@ -299,6 +311,8 @@ function installNavigationWatcher() {
 
   window.addEventListener("popstate", scheduleNavigationReset, { passive: true });
   window.addEventListener("hashchange", scheduleNavigationReset, { passive: true });
+  window.addEventListener("resize", repositionWelcomeMessage, { passive: true });
+  window.addEventListener("scroll", repositionWelcomeMessage, { passive: true, capture: true });
 
   const originalPushState = history.pushState.bind(history);
   history.pushState = ((...args: Parameters<History["pushState"]>) => {
@@ -325,6 +339,7 @@ function scheduleNavigationReset() {
 
 function resetInjectionState() {
   stopInjectionWatcher();
+  hideWelcomeMessage();
   document.getElementById(CTX_BUTTON_ID)?.closest(`#${CTX_SHELL_ID}`)?.remove();
   menuOpen = false;
   startInjectionWatcher();
@@ -485,9 +500,6 @@ function createLauncherShell(refElement: HTMLElement) {
       #${CTX_SHELL_ID}[data-platform="deepseek"] {
         margin: 0 7px !important;
       }
-      #${CTX_SHELL_ID}[data-welcome-hidden="true"] .welcome {
-        display: none !important;
-      }
       #${CTX_BUTTON_ID} {
         all: unset;
         position: static !important;
@@ -538,49 +550,6 @@ function createLauncherShell(refElement: HTMLElement) {
       }
       #${CTX_BUTTON_ID}.fallback img { display: none; }
       #${CTX_BUTTON_ID}.fallback .fallback-label { display: block; }
-      #${CTX_SHELL_ID} .welcome {
-        position: absolute;
-        right: -5px;
-        bottom: calc(var(--ctx-toolbar-button-size, ${defaultLauncherSize}px) + 10px);
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        max-width: min(260px, calc(100vw - 32px));
-        white-space: nowrap;
-        border: 1px solid rgba(139,92,246,.82);
-        border-radius: 999px;
-        background: rgba(17,24,39,.98);
-        color: #e5e7eb;
-        padding: 7px 11px;
-        font: 800 12px/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
-        letter-spacing: 0;
-        box-shadow: 0 14px 44px rgba(0,0,0,.38), inset 0 0 0 1px rgba(255,255,255,.04);
-        pointer-events: none;
-        z-index: 2147483647;
-        opacity: 0;
-        transform: translateY(4px);
-        animation: ctxWelcome 5200ms ease both;
-      }
-      #${CTX_SHELL_ID}:hover .welcome {
-        opacity: 1;
-        transform: translateY(0);
-        animation: none;
-      }
-      #${CTX_SHELL_ID} .welcome-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      #${CTX_SHELL_ID} .welcome-dots {
-        color: #a78bfa;
-        font-weight: 900;
-        letter-spacing: 2px;
-      }
-      @keyframes ctxWelcome {
-        0% { opacity: 0; transform: translateY(4px) scale(.98); }
-        12% { opacity: 1; transform: translateY(0) scale(1); }
-        78% { opacity: 1; transform: translateY(0) scale(1); }
-        100% { opacity: 0; transform: translateY(3px) scale(.98); }
-      }
       #${CTX_SHELL_ID} .menu {
         position: absolute;
         right: 0;
@@ -666,10 +635,6 @@ function createLauncherShell(refElement: HTMLElement) {
       <img src="${markUrl}" alt="" />
       <span class="fallback-label">CTX</span>
     </button>
-    <span class="welcome" aria-hidden="true">
-      <span class="welcome-text"></span>
-      <span class="welcome-dots">•••</span>
-    </span>
     <section class="menu" aria-label="CTX actions">
       <button type="button" class="generate"><span class="icon">${plusIcon()}</span><span>Generate Capsule</span></button>
       <button type="button" class="drop"><span class="icon">${dropIcon()}</span><span>Drop Capsule</span></button>
@@ -686,14 +651,16 @@ function createLauncherShell(refElement: HTMLElement) {
   const logo = shell.querySelector(`#${CTX_BUTTON_ID} img`) as HTMLImageElement;
 
   syncLauncherMetrics(shell, launcher, refElement);
-  void applyWelcomeMessage(shell);
+  void showWelcomeMessage(launcher, 5200);
 
   logo.addEventListener("error", () => launcher.classList.add("fallback"));
   logo.addEventListener("load", () => launcher.classList.remove("fallback"));
+  launcher.addEventListener("mouseenter", () => void showWelcomeMessage(launcher, 2400));
 
   launcher.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    hideWelcomeMessage();
     menuOpen = !menuOpen;
     menu.dataset.open = String(menuOpen);
     if (menuOpen) void refreshStatus(status);
@@ -1018,28 +985,173 @@ function syncLauncherMetrics(shell: HTMLElement, button: HTMLButtonElement, refE
   button.style.height = `${size}px`;
 }
 
-async function applyWelcomeMessage(shell: HTMLElement) {
-  const text = shell.querySelector<HTMLElement>(".welcome-text");
-  if (!text) return;
-
-  try {
-    const settings = await chrome.storage.local.get({ welcomeMessage: defaultWelcomeMessage });
-    const message = String(settings.welcomeMessage || defaultWelcomeMessage).trim().slice(0, 44);
-    if (!message) {
-      shell.dataset.welcomeHidden = "true";
+function cleanupLegacyLaunchers() {
+  document.querySelectorAll<HTMLElement>(LEGACY_LAUNCHER_SELECTOR).forEach((element) => element.remove());
+  document.querySelectorAll<HTMLElement>(`#${CTX_WELCOME_ID}`).forEach((element, index) => {
+    if (index === 0) {
+      welcomeHost = element;
       return;
     }
-    delete shell.dataset.welcomeHidden;
-    text.textContent = message;
+    element.remove();
+  });
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`#${CTX_BUTTON_ID}`));
+  buttons.slice(1).forEach((button) => button.closest(`#${CTX_SHELL_ID}`)?.remove() ?? button.remove());
+}
+
+async function showWelcomeMessage(anchor: HTMLElement, visibleMs = 3200) {
+  const host = ensureWelcomeHost();
+  const text = host.querySelector<HTMLElement>(".ctx-welcome-text");
+  if (!text) return;
+
+  const message = pickWelcomeMessage(await readWelcomeMessages());
+  if (!message) return;
+  if (!anchor.isConnected) return;
+
+  welcomeAnchor = anchor;
+  text.textContent = message;
+  positionWelcomeHost(host, anchor);
+  host.dataset.show = "true";
+
+  window.requestAnimationFrame(() => positionWelcomeHost(host, anchor));
+  if (welcomeTimer) window.clearTimeout(welcomeTimer);
+  welcomeTimer = window.setTimeout(() => {
+    welcomeTimer = null;
+    hideWelcomeMessage();
+  }, visibleMs);
+}
+
+function hideWelcomeMessage() {
+  if (welcomeTimer) {
+    window.clearTimeout(welcomeTimer);
+    welcomeTimer = null;
+  }
+  if (welcomeHost) welcomeHost.dataset.show = "false";
+  welcomeAnchor = null;
+}
+
+function ensureWelcomeHost() {
+  const existing = document.getElementById(CTX_WELCOME_ID);
+  if (existing) {
+    welcomeHost = existing;
+    return existing;
+  }
+
+  const host = document.createElement("div");
+  host.id = CTX_WELCOME_ID;
+  host.setAttribute("aria-hidden", "true");
+  host.dataset.show = "false";
+  host.innerHTML = `
+    <style>
+      #${CTX_WELCOME_ID} {
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        z-index: 2147483647 !important;
+        max-width: min(280px, calc(100vw - 20px));
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        pointer-events: none !important;
+        box-sizing: border-box !important;
+        opacity: 0;
+        transform: translateY(4px) scale(.98);
+        transition: opacity 180ms ease, transform 180ms ease;
+        color-scheme: dark;
+        contain: layout style paint;
+      }
+      #${CTX_WELCOME_ID}[data-show="true"] {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      #${CTX_WELCOME_ID} .ctx-welcome-pill {
+        max-width: 100%;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+        white-space: nowrap;
+        border: 1px solid rgba(139,92,246,.82);
+        border-radius: 999px;
+        background: rgba(17,24,39,.98);
+        color: #e5e7eb;
+        padding: 7px 11px;
+        font: 800 12px/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: 0;
+        box-shadow: 0 14px 44px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.05);
+        backdrop-filter: blur(14px);
+      }
+      #${CTX_WELCOME_ID} .ctx-welcome-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${CTX_WELCOME_ID} .ctx-welcome-dots {
+        color: #a78bfa;
+        font-weight: 900;
+        letter-spacing: 2px;
+      }
+    </style>
+    <span class="ctx-welcome-pill">
+      <span class="ctx-welcome-text"></span>
+      <span class="ctx-welcome-dots">...</span>
+    </span>
+  `;
+  document.documentElement.append(host);
+  welcomeHost = host;
+  return host;
+}
+
+function positionWelcomeHost(host: HTMLElement, anchor: HTMLElement) {
+  const anchorRect = anchor.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const width = hostRect.width || 190;
+  const height = hostRect.height || 30;
+  const viewportPadding = 8;
+  const gap = 10;
+  let left = anchorRect.right - width;
+  let top = anchorRect.top - height - gap;
+
+  if (top < viewportPadding) top = anchorRect.bottom + gap;
+  left = clampNumber(left, viewportPadding, Math.max(viewportPadding, window.innerWidth - width - viewportPadding));
+  top = clampNumber(top, viewportPadding, Math.max(viewportPadding, window.innerHeight - height - viewportPadding));
+
+  host.style.left = `${Math.round(left)}px`;
+  host.style.top = `${Math.round(top)}px`;
+}
+
+function repositionWelcomeMessage() {
+  if (welcomeHost?.dataset.show !== "true" || !welcomeAnchor?.isConnected) return;
+  window.requestAnimationFrame(() => {
+    if (welcomeHost?.dataset.show === "true" && welcomeAnchor?.isConnected) {
+      positionWelcomeHost(welcomeHost, welcomeAnchor);
+    }
+  });
+}
+
+async function readWelcomeMessages() {
+  try {
+    const settings = await chrome.storage.local.get({ welcomeMessage: defaultWelcomeMessages.join("\n") });
+    return parseWelcomeMessages(settings.welcomeMessage);
   } catch {
-    text.textContent = defaultWelcomeMessage;
+    return defaultWelcomeMessages;
   }
 }
 
-function cleanupLegacyLaunchers() {
-  document.querySelectorAll<HTMLElement>(LEGACY_LAUNCHER_SELECTOR).forEach((element) => element.remove());
-  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`#${CTX_BUTTON_ID}`));
-  buttons.slice(1).forEach((button) => button.closest(`#${CTX_SHELL_ID}`)?.remove() ?? button.remove());
+function parseWelcomeMessages(value: unknown) {
+  const messages = String(value || "")
+    .split(/\r?\n|[|;]/)
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .map((message) => message.slice(0, 54))
+    .slice(0, 7);
+
+  if (messages.length >= 2) return messages;
+  return defaultWelcomeMessages;
+}
+
+function pickWelcomeMessage(messages: string[]) {
+  if (!messages.length) return "";
+  return messages[Math.floor(Math.random() * messages.length)] ?? messages[0];
 }
 
 function queryVisibleElements(selector: string, root: Document | HTMLElement = document) {
