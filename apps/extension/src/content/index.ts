@@ -20,35 +20,67 @@ type DropMode = "smart" | "brief" | "full";
 let buttonHost: HTMLElement | null = null;
 let picker: HTMLElement | null = null;
 let menuOpen = false;
-const ctxWindow = window as Window & { __CTX_CONTENT_READY__?: boolean };
+const ctxWindow = window as Window & { __CTX_CONTENT_READY__?: boolean; __CTX_CONTENT_LISTENER_READY__?: boolean };
+
+const promptSelectors: Record<Platform, string[]> = {
+  chatgpt: [
+    "#prompt-textarea",
+    "[data-testid='composer-slate-editor']",
+    "[contenteditable='true'][id='prompt-textarea']",
+    "div.ProseMirror[contenteditable='true']",
+    "div[role='textbox'][contenteditable='true']",
+    "textarea"
+  ],
+  claude: ["div[contenteditable='true']", "div[role='textbox']", "textarea"],
+  gemini: ["rich-textarea div[contenteditable='true']", "div[role='textbox']", "textarea", "[contenteditable='true']"],
+  perplexity: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+  github: ["textarea[name='comment[body]']", "textarea", "[contenteditable='true']"],
+  cursor: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
+  generic: ["textarea", "[contenteditable='true']", "div[role='textbox']"]
+};
+
+registerMessageListener();
 
 if (ctxWindow.__CTX_CONTENT_READY__) {
-  mountCtxButton();
+  safeMountCtxButton();
   return;
 }
 
 ctxWindow.__CTX_CONTENT_READY__ = true;
 
-const observer = new MutationObserver(() => mountCtxButton());
+const observer = new MutationObserver(() => safeMountCtxButton());
 observer.observe(document.documentElement, { childList: true, subtree: true });
-mountCtxButton();
+safeMountCtxButton();
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "ctx:ping-content") {
-    mountCtxButton();
-    sendResponse({ ok: true });
+function registerMessageListener() {
+  if (ctxWindow.__CTX_CONTENT_LISTENER_READY__) return;
+  ctxWindow.__CTX_CONTENT_LISTENER_READY__ = true;
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "ctx:ping-content") {
+      safeMountCtxButton();
+      sendResponse({ ok: true });
+      return false;
+    }
+    if (message?.type === "ctx:capture-selection") {
+      captureSelection().then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+    if (message?.type === "ctx:capture-page") {
+      capturePage().then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
     return false;
+  });
+}
+
+function safeMountCtxButton() {
+  try {
+    mountCtxButton();
+  } catch (error) {
+    console.warn("CTX could not mount the launcher.", error);
   }
-  if (message?.type === "ctx:capture-selection") {
-    captureSelection().then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-  if (message?.type === "ctx:capture-page") {
-    capturePage().then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-  return false;
-});
+}
 
 function detectPlatform(host = location.hostname): Platform {
   const normalized = host.toLowerCase();
@@ -223,23 +255,6 @@ function placeButton(host: HTMLElement) {
   host.style.right = `${Math.max(16, window.innerWidth - rect.right + 10)}px`;
   host.style.bottom = `${Math.max(18, window.innerHeight - rect.bottom + 10)}px`;
 }
-
-const promptSelectors: Record<Platform, string[]> = {
-  chatgpt: [
-    "#prompt-textarea",
-    "[data-testid='composer-slate-editor']",
-    "[contenteditable='true'][id='prompt-textarea']",
-    "div.ProseMirror[contenteditable='true']",
-    "div[role='textbox'][contenteditable='true']",
-    "textarea"
-  ],
-  claude: ["div[contenteditable='true']", "div[role='textbox']", "textarea"],
-  gemini: ["rich-textarea div[contenteditable='true']", "div[role='textbox']", "textarea", "[contenteditable='true']"],
-  perplexity: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
-  github: ["textarea[name='comment[body]']", "textarea", "[contenteditable='true']"],
-  cursor: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
-  generic: ["textarea", "[contenteditable='true']", "div[role='textbox']"]
-};
 
 function findPrompt(platform: Platform): HTMLElement | null {
   const selectors = [...(promptSelectors[platform] ?? []), ...promptSelectors.generic];
