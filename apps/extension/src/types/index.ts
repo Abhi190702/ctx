@@ -17,6 +17,12 @@ export type Capsule = {
 export type ExtensionSettings = {
   apiUrl: string;
   welcomeMessage: string;
-  tokenDailyLimit: number;
-  tokenWeeklyLimit: number;
+  tokenBudgetsUSD: TokenBudgetSettings;
+};
+
+export type TokenBudgetSettings = {
+  openai: { dailyUSD: number; weeklyUSD: number };
+  gemini: { dailyUSD: number; weeklyUSD: number };
+  anthropic: { dailyUSD: number; weeklyUSD: number };
+  other: { dailyUSD: number; weeklyUSD: number };
 };

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getSettings, saveSettings } from "../services/storage";
+import type { TokenBudgetSettings } from "../types";
+import { defaultTokenBudgetsUSD, getSettings, saveSettings } from "../services/storage";
 
 const defaultWelcomeMessages = [
   "Your AI needs context",
@@ -14,16 +15,14 @@ const defaultWelcomeMessages = [
 export function Options() {
   const [apiUrl, setApiUrl] = useState("http://localhost:3000/api");
   const [welcomeMessage, setWelcomeMessage] = useState(defaultWelcomeMessages);
-  const [tokenDailyLimit, setTokenDailyLimit] = useState(50000);
-  const [tokenWeeklyLimit, setTokenWeeklyLimit] = useState(300000);
+  const [tokenBudgetsUSD, setTokenBudgetsUSD] = useState<TokenBudgetSettings>(defaultTokenBudgetsUSD);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     getSettings().then((settings) => {
       setApiUrl(settings.apiUrl);
       setWelcomeMessage(settings.welcomeMessage);
-      setTokenDailyLimit(settings.tokenDailyLimit);
-      setTokenWeeklyLimit(settings.tokenWeeklyLimit);
+      setTokenBudgetsUSD(settings.tokenBudgetsUSD);
     });
   }, []);
 
@@ -32,11 +31,20 @@ export function Options() {
     await saveSettings({
       apiUrl,
       welcomeMessage: welcomeMessage.trim() || defaultWelcomeMessages,
-      tokenDailyLimit: Math.max(1000, Math.round(tokenDailyLimit || 50000)),
-      tokenWeeklyLimit: Math.max(1000, Math.round(tokenWeeklyLimit || 300000))
+      tokenBudgetsUSD: normalizeBudgets(tokenBudgetsUSD)
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
+  }
+
+  function updateBudget(provider: keyof TokenBudgetSettings, field: "dailyUSD" | "weeklyUSD", value: number) {
+    setTokenBudgetsUSD((current) => ({
+      ...current,
+      [provider]: {
+        ...current[provider],
+        [field]: value
+      }
+    }));
   }
 
   return (
@@ -56,31 +64,56 @@ export function Options() {
           spellCheck={false}
         />
         <fieldset>
-          <legend>Token usage meter</legend>
-          <label htmlFor="token-daily-limit">Daily token budget</label>
-          <input
-            id="token-daily-limit"
-            min={1000}
-            name="tokenDailyLimit"
-            step={1000}
-            type="number"
-            value={tokenDailyLimit}
-            onChange={(event) => setTokenDailyLimit(Number(event.target.value))}
-          />
-          <label htmlFor="token-weekly-limit">Weekly token budget</label>
-          <input
-            id="token-weekly-limit"
-            min={1000}
-            name="tokenWeeklyLimit"
-            step={1000}
-            type="number"
-            value={tokenWeeklyLimit}
-            onChange={(event) => setTokenWeeklyLimit(Number(event.target.value))}
-          />
+          <legend>USD usage budgets</legend>
+          {(Object.keys(tokenBudgetsUSD) as Array<keyof TokenBudgetSettings>).map((provider) => (
+            <section className="budget-row" key={provider}>
+              <strong>{providerLabels[provider]}</strong>
+              <label htmlFor={`${provider}-daily-budget`}>Daily $</label>
+              <input
+                id={`${provider}-daily-budget`}
+                min={0.01}
+                step={0.25}
+                type="number"
+                value={tokenBudgetsUSD[provider].dailyUSD}
+                onChange={(event) => updateBudget(provider, "dailyUSD", Number(event.target.value))}
+              />
+              <label htmlFor={`${provider}-weekly-budget`}>Weekly $</label>
+              <input
+                id={`${provider}-weekly-budget`}
+                min={0.01}
+                step={0.25}
+                type="number"
+                value={tokenBudgetsUSD[provider].weeklyUSD}
+                onChange={(event) => updateBudget(provider, "weeklyUSD", Number(event.target.value))}
+              />
+            </section>
+          ))}
         </fieldset>
         <button type="submit">Save Settings</button>
       </form>
       {saved ? <p aria-live="polite">Saved.</p> : null}
     </main>
   );
+}
+
+const providerLabels: Record<keyof TokenBudgetSettings, string> = {
+  openai: "OpenAI / ChatGPT",
+  gemini: "Google Gemini",
+  anthropic: "Anthropic Claude",
+  other: "Other AI"
+};
+
+function normalizeBudgets(value: TokenBudgetSettings): TokenBudgetSettings {
+  return {
+    openai: normalizeBudget(value.openai),
+    gemini: normalizeBudget(value.gemini),
+    anthropic: normalizeBudget(value.anthropic),
+    other: normalizeBudget(value.other)
+  };
+}
+
+function normalizeBudget(value: { dailyUSD: number; weeklyUSD: number }) {
+  const dailyUSD = Math.max(0.01, Number(value.dailyUSD) || 0.01);
+  const weeklyUSD = Math.max(dailyUSD, Number(value.weeklyUSD) || dailyUSD);
+  return { dailyUSD, weeklyUSD };
 }

@@ -45,15 +45,34 @@ type PlatformToolbarConfig = {
   insertPosition: InsertPosition;
 };
 
-type TokenUsageTotals = {
-  daily: number;
-  weekly: number;
+type BillingPlatform = "openai" | "gemini" | "anthropic" | "other";
+type ModelTier = "lite" | "standard" | "reasoning";
+
+type ModelSpec = {
+  id: string;
+  platform: BillingPlatform;
+  displayName: string;
+  tier: ModelTier;
+  inputPer1M: number;
+  outputPer1M: number;
+  supportsThinking: boolean;
+  contextWindowK: number;
 };
 
-type TokenUsageStore = {
-  dailyKey: string;
-  weeklyKey: string;
-  platforms: Record<string, TokenUsageTotals>;
+type TokenBudgetSettings = Record<BillingPlatform, { dailyUSD: number; weeklyUSD: number }>;
+
+type CostUsageEntry = {
+  id: string;
+  platform: Platform;
+  billingPlatform: BillingPlatform;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+  costUSD: number;
+  estimated: boolean;
+  timestamp: number;
+  tags: string[];
 };
 
 const CTX_BUTTON_ID = "ctx-patchpilot-btn";
@@ -61,10 +80,14 @@ const CTX_SHELL_ID = "ctx-patchpilot-shell";
 const CTX_WELCOME_ID = "ctx-patchpilot-welcome";
 const CTX_USAGE_METER_ID = "ctx-token-usage-meter";
 const LEGACY_LAUNCHER_SELECTOR = "[data-ctx-extension='launcher']:not(#ctx-patchpilot-shell)";
-const TOKEN_USAGE_STORAGE_KEY = "ctxTokenUsage";
+const TOKEN_USAGE_LOG_STORAGE_KEY = "ctxTokenUsageLogV2";
 const defaultLauncherSize = 26;
-const defaultDailyTokenLimit = 50000;
-const defaultWeeklyTokenLimit = 300000;
+const defaultTokenBudgetsUSD: TokenBudgetSettings = {
+  openai: { dailyUSD: 5, weeklyUSD: 25 },
+  gemini: { dailyUSD: 3, weeklyUSD: 15 },
+  anthropic: { dailyUSD: 5, weeklyUSD: 25 },
+  other: { dailyUSD: 2, weeklyUSD: 10 }
+};
 const defaultWelcomeMessages = [
   "Your AI needs context",
   "Drop memory before you prompt",
@@ -74,6 +97,45 @@ const defaultWelcomeMessages = [
   "Use a capsule, skip the recap",
   "Keep the work moving"
 ];
+
+const MODEL_REGISTRY: Record<string, ModelSpec> = {
+  "gpt-4o": model("gpt-4o", "openai", "GPT-4o", "standard", 2.5, 10, false, 128),
+  "gpt-4o-mini": model("gpt-4o-mini", "openai", "GPT-4o Mini", "lite", 0.15, 0.6, false, 128),
+  "gpt-4.1": model("gpt-4.1", "openai", "GPT-4.1", "standard", 2, 8, false, 1000),
+  "gpt-4.1-mini": model("gpt-4.1-mini", "openai", "GPT-4.1 Mini", "lite", 0.4, 1.6, false, 1000),
+  "gpt-4.1-nano": model("gpt-4.1-nano", "openai", "GPT-4.1 Nano", "lite", 0.1, 0.4, false, 1000),
+  o3: model("o3", "openai", "o3", "reasoning", 10, 40, true, 200),
+  "o4-mini": model("o4-mini", "openai", "o4-mini", "reasoning", 1.1, 4.4, true, 200),
+  "o3-mini": model("o3-mini", "openai", "o3-mini", "reasoning", 1.1, 4.4, true, 200),
+  "gemini-2.5-pro": model("gemini-2.5-pro", "gemini", "Gemini 2.5 Pro", "standard", 1.25, 10, false, 1000),
+  "gemini-2.5-flash": model("gemini-2.5-flash", "gemini", "Gemini 2.5 Flash", "lite", 0.15, 0.6, false, 1000),
+  "gemini-2.5-flash-think": model("gemini-2.5-flash-think", "gemini", "Gemini 2.5 Flash Thinking", "reasoning", 0.15, 3.5, true, 1000),
+  "gemini-2.0-flash": model("gemini-2.0-flash", "gemini", "Gemini 2.0 Flash", "lite", 0.1, 0.4, false, 1000),
+  "gemini-2.0-pro": model("gemini-2.0-pro", "gemini", "Gemini 2.0 Pro", "standard", 1.25, 5, false, 2000),
+  "gemini-1.5-pro": model("gemini-1.5-pro", "gemini", "Gemini 1.5 Pro", "standard", 1.25, 5, false, 1000),
+  "gemini-1.5-flash": model("gemini-1.5-flash", "gemini", "Gemini 1.5 Flash", "lite", 0.075, 0.3, false, 1000),
+  "claude-opus-4": model("claude-opus-4", "anthropic", "Claude Opus 4", "standard", 15, 75, false, 200),
+  "claude-opus-4-thinking": model("claude-opus-4-thinking", "anthropic", "Claude Opus 4 Thinking", "reasoning", 15, 75, true, 200),
+  "claude-sonnet-4-5": model("claude-sonnet-4-5", "anthropic", "Claude Sonnet 4.5", "standard", 3, 15, false, 200),
+  "claude-sonnet-4-5-thinking": model("claude-sonnet-4-5-thinking", "anthropic", "Claude Sonnet 4.5 Thinking", "reasoning", 3, 15, true, 200),
+  "claude-haiku-4-5": model("claude-haiku-4-5", "anthropic", "Claude Haiku 4.5", "lite", 0.8, 4, false, 200),
+  "claude-sonnet-4-6": model("claude-sonnet-4-6", "anthropic", "Claude Sonnet 4.6", "standard", 3, 15, false, 200),
+  "claude-opus-4-6": model("claude-opus-4-6", "anthropic", "Claude Opus 4.6", "standard", 15, 75, false, 200),
+  "ctx-generic-ai": model("ctx-generic-ai", "other", "Generic AI estimate", "standard", 1, 3, false, 128)
+};
+
+function model(
+  id: string,
+  platform: BillingPlatform,
+  displayName: string,
+  tier: ModelTier,
+  inputPer1M: number,
+  outputPer1M: number,
+  supportsThinking: boolean,
+  contextWindowK: number
+): ModelSpec {
+  return { id, platform, displayName, tier, inputPer1M, outputPer1M, supportsThinking, contextWindowK };
+}
 let injectionObserver: MutationObserver | null = null;
 let fallbackTimer: number | null = null;
 let retryTimer: number | null = null;
@@ -1322,16 +1384,16 @@ function ensureUsageMeterHost() {
       }
     </style>
     <section class="meter">
-      <span class="platform">CTX Tokens</span>
+      <span class="platform">CTX Cost</span>
       <span class="quota daily">
         <span class="label">Today</span>
         <span class="track"><span class="fill"></span></span>
-        <span class="value">0 / 50k</span>
+        <span class="value">$0.00 / $5.00</span>
       </span>
       <span class="quota weekly">
         <span class="label">Week</span>
         <span class="track"><span class="fill"></span></span>
-        <span class="value">0 / 300k</span>
+        <span class="value">$0.00 / $25.00</span>
       </span>
     </section>
   `;
@@ -1367,26 +1429,31 @@ async function updateUsageMeter() {
   positionUsageMeterHost(host, usageMeterAnchor);
 
   const platform = detectPlatform();
-  const settings = await readTokenMeterSettings();
-  const store = await readTokenUsageStore();
-  const totals = store.platforms[platform] ?? { daily: 0, weekly: 0 };
+  const modelSpec = detectActiveModel(platform);
+  const budgets = await readTokenBudgetSettings();
+  const budget = budgets[modelSpec.platform];
+  const stats = aggregateCostUsage(await readCostUsageLog(), platform);
   const currentPromptTokens = estimateTokens(readPromptText(findPrompt(platform)));
-  const dailyPercent = percentUsed(totals.daily + currentPromptTokens, settings.tokenDailyLimit);
-  const weeklyPercent = percentUsed(totals.weekly + currentPromptTokens, settings.tokenWeeklyLimit);
+  const currentEstimate = estimateCallFromInput(modelSpec.id, currentPromptTokens);
+  const dailyPercent = percentUsed(stats.daily.costUSD + currentEstimate.costUSD, budget.dailyUSD);
+  const weeklyPercent = percentUsed(stats.weekly.costUSD + currentEstimate.costUSD, budget.weeklyUSD);
   const level = Math.max(dailyPercent, weeklyPercent) >= 92 ? "danger" : Math.max(dailyPercent, weeklyPercent) >= 76 ? "watch" : "ok";
 
   host.dataset.level = level;
+  host.dataset.estimated = "true";
   const platformText = host.querySelector<HTMLElement>(".platform");
   const dailyFill = host.querySelector<HTMLElement>(".daily .fill");
   const weeklyFill = host.querySelector<HTMLElement>(".weekly .fill");
   const dailyValue = host.querySelector<HTMLElement>(".daily .value");
   const weeklyValue = host.querySelector<HTMLElement>(".weekly .value");
 
-  if (platformText) platformText.textContent = `${platformLabel(platform)} · now ${formatTokenCount(currentPromptTokens)}`;
+  if (platformText) {
+    platformText.textContent = `${platformLabel(platform)} · ${modelSpec.displayName} · now ${formatUSD(currentEstimate.costUSD)} est`;
+  }
   if (dailyFill) dailyFill.style.width = `${Math.round(dailyPercent)}%`;
   if (weeklyFill) weeklyFill.style.width = `${Math.round(weeklyPercent)}%`;
-  if (dailyValue) dailyValue.textContent = `${formatTokenCount(totals.daily)} / ${formatTokenCount(settings.tokenDailyLimit)}`;
-  if (weeklyValue) weeklyValue.textContent = `${formatTokenCount(totals.weekly)} / ${formatTokenCount(settings.tokenWeeklyLimit)}`;
+  if (dailyValue) dailyValue.textContent = `${formatUSD(stats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)}`;
+  if (weeklyValue) weeklyValue.textContent = `${formatUSD(stats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}`;
 }
 
 function positionUsageMeterHost(host: HTMLElement, anchor: HTMLElement) {
@@ -1463,71 +1530,101 @@ async function recordPromptUsage() {
   const platform = detectPlatform();
   const prompt = findPrompt(platform);
   const text = readPromptText(prompt);
-  const tokens = estimateTokens(text);
-  if (tokens <= 0) return;
+  const inputTokens = estimateTokens(text);
+  if (inputTokens <= 0) return;
+  const modelSpec = detectActiveModel(platform);
+  const estimate = estimateCallFromInput(modelSpec.id, inputTokens);
 
-  const signature = `${platform}:${hashText(text)}:${tokens}`;
+  const signature = `${platform}:${modelSpec.id}:${hashText(text)}:${inputTokens}`;
   const now = Date.now();
   if (signature === lastTokenRecordSignature && now - lastTokenRecordAt < 8000) return;
   lastTokenRecordSignature = signature;
   lastTokenRecordAt = now;
 
-  await addTokenUsage(platform, tokens);
+  await appendCostUsage({
+    id: createUsageId(),
+    platform,
+    billingPlatform: modelSpec.platform,
+    modelId: modelSpec.id,
+    inputTokens: estimate.inputTokens,
+    outputTokens: estimate.outputTokens,
+    thinkingTokens: 0,
+    costUSD: estimate.costUSD,
+    estimated: true,
+    timestamp: now,
+    tags: ["web-chat", "estimated"]
+  });
 }
 
-async function addTokenUsage(platform: Platform, tokens: number) {
-  const store = await readTokenUsageStore();
-  const current = store.platforms[platform] ?? { daily: 0, weekly: 0 };
-  store.platforms[platform] = {
-    daily: current.daily + tokens,
-    weekly: current.weekly + tokens
-  };
-  await chrome.storage.local.set({ [TOKEN_USAGE_STORAGE_KEY]: store });
+async function appendCostUsage(entry: CostUsageEntry) {
+  const log = await readCostUsageLog();
+  log.push(entry);
+  await chrome.storage.local.set({ [TOKEN_USAGE_LOG_STORAGE_KEY]: log });
   scheduleUsageMeterUpdate();
 }
 
-async function readTokenUsageStore(): Promise<TokenUsageStore> {
-  const defaults = createTokenUsageStore();
-  const stored = await chrome.storage.local.get({ [TOKEN_USAGE_STORAGE_KEY]: defaults });
-  const value = stored[TOKEN_USAGE_STORAGE_KEY] as Partial<TokenUsageStore> | undefined;
-  const dailyKey = currentDailyKey();
-  const weeklyKey = currentWeeklyKey();
-  return {
-    dailyKey,
-    weeklyKey,
-    platforms: resetExpiredUsage(value, dailyKey, weeklyKey)
-  };
+async function readCostUsageLog() {
+  const stored = await chrome.storage.local.get({ [TOKEN_USAGE_LOG_STORAGE_KEY]: [] });
+  const entries = stored[TOKEN_USAGE_LOG_STORAGE_KEY];
+  if (!Array.isArray(entries)) return [];
+  return entries.filter(isCostUsageEntry);
 }
 
-function createTokenUsageStore(): TokenUsageStore {
-  return {
-    dailyKey: currentDailyKey(),
-    weeklyKey: currentWeeklyKey(),
-    platforms: {}
-  };
+function isCostUsageEntry(value: unknown): value is CostUsageEntry {
+  const entry = value as Partial<CostUsageEntry>;
+  return (
+    typeof entry.id === "string" &&
+    typeof entry.modelId === "string" &&
+    typeof entry.costUSD === "number" &&
+    typeof entry.timestamp === "number" &&
+    typeof entry.platform === "string"
+  );
 }
 
-function resetExpiredUsage(value: Partial<TokenUsageStore> | undefined, dailyKey: string, weeklyKey: string) {
-  const platforms = value?.platforms ?? {};
-  const next: Record<string, TokenUsageTotals> = {};
-  for (const [platform, totals] of Object.entries(platforms)) {
-    next[platform] = {
-      daily: value?.dailyKey === dailyKey ? Math.max(0, Number(totals?.daily) || 0) : 0,
-      weekly: value?.weeklyKey === weeklyKey ? Math.max(0, Number(totals?.weekly) || 0) : 0
-    };
+function aggregateCostUsage(entries: CostUsageEntry[], platform: Platform) {
+  const { todayStart, weekStart } = getTimeWindow();
+  const stats = {
+    daily: { costUSD: 0, calls: 0 },
+    weekly: { costUSD: 0, calls: 0 }
+  };
+  for (const entry of entries) {
+    if (entry.platform !== platform) continue;
+    if (entry.timestamp >= todayStart) {
+      stats.daily.costUSD += entry.costUSD;
+      stats.daily.calls += 1;
+    }
+    if (entry.timestamp >= weekStart) {
+      stats.weekly.costUSD += entry.costUSD;
+      stats.weekly.calls += 1;
+    }
   }
-  return next;
+  stats.daily.costUSD = roundUSD(stats.daily.costUSD);
+  stats.weekly.costUSD = roundUSD(stats.weekly.costUSD);
+  return stats;
 }
 
-async function readTokenMeterSettings() {
+async function readTokenBudgetSettings(): Promise<TokenBudgetSettings> {
   const settings = await chrome.storage.local.get({
-    tokenDailyLimit: defaultDailyTokenLimit,
-    tokenWeeklyLimit: defaultWeeklyTokenLimit
+    tokenBudgetsUSD: defaultTokenBudgetsUSD
   });
+  return normalizeTokenBudgets(settings.tokenBudgetsUSD);
+}
+
+function normalizeTokenBudgets(value: unknown): TokenBudgetSettings {
+  const input = value as Partial<TokenBudgetSettings> | undefined;
   return {
-    tokenDailyLimit: Math.max(1000, Number(settings.tokenDailyLimit) || defaultDailyTokenLimit),
-    tokenWeeklyLimit: Math.max(1000, Number(settings.tokenWeeklyLimit) || defaultWeeklyTokenLimit)
+    openai: normalizeBudget(input?.openai, defaultTokenBudgetsUSD.openai),
+    gemini: normalizeBudget(input?.gemini, defaultTokenBudgetsUSD.gemini),
+    anthropic: normalizeBudget(input?.anthropic, defaultTokenBudgetsUSD.anthropic),
+    other: normalizeBudget(input?.other, defaultTokenBudgetsUSD.other)
   };
+}
+
+function normalizeBudget(value: unknown, fallback: { dailyUSD: number; weeklyUSD: number }) {
+  const budget = value as Partial<{ dailyUSD: number; weeklyUSD: number }> | undefined;
+  const dailyUSD = Math.max(0.01, Number(budget?.dailyUSD) || fallback.dailyUSD);
+  const weeklyUSD = Math.max(dailyUSD, Number(budget?.weeklyUSD) || fallback.weeklyUSD);
+  return { dailyUSD, weeklyUSD };
 }
 
 function readPromptText(prompt: HTMLElement | null) {
@@ -1558,18 +1655,95 @@ function estimateTokens(text: string) {
   return Math.max(1, Math.ceil(Math.max(normalized.length / 4, wordCount * 1.25)));
 }
 
+function calculateCost(modelId: string, inputTokens: number, outputTokens: number, thinkingTokens = 0) {
+  const modelSpec = getModel(modelId);
+  const inputCost = (inputTokens / 1_000_000) * modelSpec.inputPer1M;
+  const outputCost = (outputTokens / 1_000_000) * modelSpec.outputPer1M;
+  if (!modelSpec.supportsThinking && thinkingTokens > 0) {
+    console.warn(`CTX token meter: ${modelId} does not bill thinking tokens separately; ignoring ${thinkingTokens} tokens.`);
+  }
+  const thinkingCost = modelSpec.supportsThinking ? (thinkingTokens / 1_000_000) * modelSpec.outputPer1M : 0;
+  return roundUSD(inputCost + outputCost + thinkingCost);
+}
+
+function estimateCallFromInput(modelId: string, inputTokens: number) {
+  if (inputTokens <= 0) return { inputTokens: 0, outputTokens: 0, costUSD: 0 };
+  const estimatedTotalTokens = Math.ceil(inputTokens / 0.3);
+  const outputTokens = Math.max(0, estimatedTotalTokens - inputTokens);
+  return {
+    inputTokens,
+    outputTokens,
+    costUSD: calculateCost(modelId, inputTokens, outputTokens, 0)
+  };
+}
+
+function getModel(modelId: string) {
+  const modelSpec = MODEL_REGISTRY[modelId];
+  if (!modelSpec) throw new Error(`CTX token meter: unknown model "${modelId}".`);
+  return modelSpec;
+}
+
+function detectActiveModel(platform: Platform) {
+  return getModel(detectModelId(platform));
+}
+
+function detectModelId(platform: Platform) {
+  const pageText = getPageTextSample();
+  if (platform === "chatgpt") return detectOpenAIModel(pageText);
+  if (platform === "copilot") return detectOpenAIModel(pageText, "gpt-4o-mini");
+  if (platform === "claude") return detectClaudeModel(pageText);
+  if (platform === "gemini" || platform === "notebooklm") return detectGeminiModel(pageText);
+  return "ctx-generic-ai";
+}
+
+function detectOpenAIModel(text: string, fallback = "gpt-4o-mini") {
+  if (/\bo4[-\s]?mini\b/.test(text)) return "o4-mini";
+  if (/\bo3[-\s]?mini\b/.test(text)) return "o3-mini";
+  if (/\bo3\b/.test(text)) return "o3";
+  if (/gpt[-\s]?4\.1[-\s]?nano|4\.1\s+nano/.test(text)) return "gpt-4.1-nano";
+  if (/gpt[-\s]?4\.1[-\s]?mini|4\.1\s+mini/.test(text)) return "gpt-4.1-mini";
+  if (/gpt[-\s]?4\.1\b|4\.1\b/.test(text)) return "gpt-4.1";
+  if (/gpt[-\s]?4o[-\s]?mini|4o\s+mini/.test(text)) return "gpt-4o-mini";
+  if (/gpt[-\s]?4o|\b4o\b/.test(text)) return "gpt-4o";
+  return fallback;
+}
+
+function detectGeminiModel(text: string) {
+  if (/2\.5.*flash.*(think|thinking)|thinking/.test(text)) return "gemini-2.5-flash-think";
+  if (/2\.5.*pro|\bpro\b/.test(text)) return "gemini-2.5-pro";
+  if (/2\.0.*pro/.test(text)) return "gemini-2.0-pro";
+  if (/1\.5.*pro/.test(text)) return "gemini-1.5-pro";
+  if (/1\.5.*flash/.test(text)) return "gemini-1.5-flash";
+  if (/2\.0.*flash/.test(text)) return "gemini-2.0-flash";
+  return "gemini-2.5-flash";
+}
+
+function detectClaudeModel(text: string) {
+  const thinking = /thinking|extended/.test(text);
+  if (/opus.*4\.6|4\.6.*opus/.test(text)) return "claude-opus-4-6";
+  if (/sonnet.*4\.6|4\.6.*sonnet/.test(text)) return "claude-sonnet-4-6";
+  if (/haiku.*4\.5|4\.5.*haiku/.test(text)) return "claude-haiku-4-5";
+  if (/opus.*4|4.*opus/.test(text)) return thinking ? "claude-opus-4-thinking" : "claude-opus-4";
+  if (/sonnet.*4\.5|4\.5.*sonnet/.test(text)) return thinking ? "claude-sonnet-4-5-thinking" : "claude-sonnet-4-5";
+  return thinking ? "claude-sonnet-4-5-thinking" : "claude-sonnet-4-6";
+}
+
+function getPageTextSample() {
+  return (document.body?.innerText || "").slice(0, 12000).toLowerCase();
+}
+
 function percentUsed(used: number, limit: number) {
   return clampNumber(limit > 0 ? (used / limit) * 100 : 0, 0, 100);
 }
 
-function formatTokenCount(value: number) {
-  if (value >= 1000000) return `${trimNumber(value / 1000000)}m`;
-  if (value >= 1000) return `${trimNumber(value / 1000)}k`;
-  return String(Math.max(0, Math.round(value)));
+function formatUSD(value: number) {
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 100) return `$${value.toFixed(2)}`;
+  return `$${Math.round(value).toLocaleString()}`;
 }
 
-function trimNumber(value: number) {
-  return value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
+function roundUSD(value: number) {
+  return Math.round(value * 1e8) / 1e8;
 }
 
 function platformLabel(platform: Platform) {
@@ -1598,20 +1772,13 @@ function platformLabel(platform: Platform) {
   return labels[platform];
 }
 
-function currentDailyKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function currentWeeklyKey(date = new Date()) {
-  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = copy.getDay() || 7;
-  copy.setDate(copy.getDate() + 4 - day);
-  const yearStart = new Date(copy.getFullYear(), 0, 1);
-  const week = Math.ceil(((copy.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${copy.getFullYear()}-W${String(week).padStart(2, "0")}`;
+function getTimeWindow() {
+  const now = new Date();
+  const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayOfWeek = now.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = todayStart - daysToMonday * 86_400_000;
+  return { todayStart, weekStart };
 }
 
 function hashText(text: string) {
@@ -1620,6 +1787,11 @@ function hashText(text: string) {
     hash = (hash * 33) ^ text.charCodeAt(i);
   }
   return (hash >>> 0).toString(36);
+}
+
+function createUsageId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `usage_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 }
 
 function queryVisibleElements(selector: string, root: Document | HTMLElement = document) {

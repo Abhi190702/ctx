@@ -35,6 +35,27 @@ legend {
   padding: 0 6px;
 }
 
+.budget-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(86px, 110px) auto minmax(86px, 110px);
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(139, 245, 207, 0.12);
+  border-radius: 8px;
+  background: rgba(5, 8, 18, 0.55);
+}
+
+.budget-row strong {
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.budget-row label {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
 input,
 textarea,
 button {
@@ -66,4 +87,14 @@ textarea:focus-visible,
 button:focus-visible {
   outline: 2px solid #8bf5cf;
   outline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .budget-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .budget-row strong {
+    grid-column: 1 / -1;
+  }
 }
