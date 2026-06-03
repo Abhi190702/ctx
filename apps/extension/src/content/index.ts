@@ -70,9 +70,24 @@ type CostUsageEntry = {
   outputTokens: number;
   thinkingTokens: number;
   costUSD: number;
+  quotaUnits?: number;
   estimated: boolean;
   timestamp: number;
   tags: string[];
+};
+
+type QuotaProfile = {
+  sessionWindowMs: number;
+  weeklyWindowMs: number;
+  sessionLimitUnits: number;
+  weeklyLimitUnits: number;
+};
+
+type QuotaHint = {
+  sessionPct?: number;
+  weeklyPct?: number;
+  resetText?: string;
+  messagesLeft?: number;
 };
 
 const CTX_BUTTON_ID = "ctx-patchpilot-btn";
@@ -88,6 +103,38 @@ const defaultTokenBudgetsUSD: TokenBudgetSettings = {
   anthropic: { dailyUSD: 5, weeklyUSD: 25 },
   other: { dailyUSD: 2, weeklyUSD: 10 }
 };
+
+const quotaProfiles: Record<Platform, QuotaProfile> = {
+  chatgpt: quotaProfile(3, 80, 7 * 24, 700),
+  claude: quotaProfile(5, 20, 7 * 24, 500),
+  gemini: quotaProfile(24, 120, 7 * 24, 700),
+  perplexity: quotaProfile(24, 80, 7 * 24, 400),
+  github: quotaProfile(24, 100, 7 * 24, 500),
+  cursor: quotaProfile(24, 100, 7 * 24, 500),
+  copilot: quotaProfile(24, 80, 7 * 24, 400),
+  deepseek: quotaProfile(24, 100, 7 * 24, 500),
+  grok: quotaProfile(24, 80, 7 * 24, 400),
+  poe: quotaProfile(24, 80, 7 * 24, 400),
+  mistral: quotaProfile(24, 100, 7 * 24, 500),
+  meta: quotaProfile(24, 100, 7 * 24, 500),
+  qwen: quotaProfile(24, 100, 7 * 24, 500),
+  lovable: quotaProfile(24, 100, 7 * 24, 500),
+  replit: quotaProfile(24, 100, 7 * 24, 500),
+  emergent: quotaProfile(24, 100, 7 * 24, 500),
+  v0: quotaProfile(24, 100, 7 * 24, 500),
+  bolt: quotaProfile(24, 100, 7 * 24, 500),
+  notebooklm: quotaProfile(24, 100, 7 * 24, 500),
+  generic: quotaProfile(24, 100, 7 * 24, 500)
+};
+
+function quotaProfile(sessionHours: number, sessionLimitUnits: number, weeklyHours: number, weeklyLimitUnits: number): QuotaProfile {
+  return {
+    sessionWindowMs: sessionHours * 60 * 60 * 1000,
+    weeklyWindowMs: weeklyHours * 60 * 60 * 1000,
+    sessionLimitUnits,
+    weeklyLimitUnits
+  };
+}
 const defaultWelcomeMessages = [
   "Your AI needs context",
   "Drop memory before you prompt",
@@ -1437,35 +1484,52 @@ async function updateUsageMeter() {
   const modelSpec = detectActiveModel(platform);
   const budgets = await readTokenBudgetSettings();
   const budget = budgets[modelSpec.platform];
-  const stats = aggregateCostUsage(await readCostUsageLog(), platform);
+  const entries = await readCostUsageLog();
+  const costStats = aggregateCostUsage(entries, platform);
+  const quotaStats = aggregateQuotaUsage(entries, platform, modelSpec);
+  const quotaHint = readProviderQuotaHint();
   const currentPromptText = readPromptText(findPrompt(platform));
   const currentPromptTokens = estimateTokens(currentPromptText);
   const currentEstimate = estimateCallFromInput(modelSpec.id, currentPromptTokens);
-  const dailyPercent = percentUsed(stats.daily.costUSD + currentEstimate.costUSD, budget.dailyUSD);
-  const weeklyPercent = percentUsed(stats.weekly.costUSD + currentEstimate.costUSD, budget.weeklyUSD);
-  const level = Math.max(dailyPercent, weeklyPercent) >= 92 ? "danger" : Math.max(dailyPercent, weeklyPercent) >= 76 ? "watch" : "ok";
+  const currentQuotaUnits = estimateQuotaUnits(platform, modelSpec, currentEstimate.inputTokens, currentEstimate.outputTokens);
+  const sessionPercent = quotaHint.sessionPct ?? percentUsed(quotaStats.session.usedUnits + currentQuotaUnits, quotaStats.session.limitUnits);
+  const weeklyPercent = quotaHint.weeklyPct ?? percentUsed(quotaStats.weekly.usedUnits + currentQuotaUnits, quotaStats.weekly.limitUnits);
+  const resetText = quotaHint.resetText ?? formatDuration(Math.max(0, quotaStats.session.resetAt - Date.now()));
+  const messagesLeft = quotaHint.messagesLeft ?? Math.max(0, quotaStats.session.limitUnits - quotaStats.session.usedUnits - currentQuotaUnits);
+  const level = Math.max(sessionPercent, weeklyPercent) >= 92 ? "danger" : Math.max(sessionPercent, weeklyPercent) >= 76 ? "watch" : "ok";
 
   host.dataset.level = level;
-  host.dataset.estimated = "true";
+  host.dataset.estimated = quotaHint.sessionPct === undefined ? "true" : "false";
   const platformText = host.querySelector<HTMLElement>(".platform");
+  const sessionLabel = host.querySelector<HTMLElement>(".daily .label");
+  const weeklyLabel = host.querySelector<HTMLElement>(".weekly .label");
   const dailyFill = host.querySelector<HTMLElement>(".daily .fill");
   const weeklyFill = host.querySelector<HTMLElement>(".weekly .fill");
   const dailyValue = host.querySelector<HTMLElement>(".daily .value");
   const weeklyValue = host.querySelector<HTMLElement>(".weekly .value");
 
+  if (sessionLabel) sessionLabel.textContent = "Session";
+  if (weeklyLabel) weeklyLabel.textContent = "Weekly";
   if (platformText) {
-    platformText.textContent = `${platformLabel(platform)} · ${modelSpec.displayName} · ${formatTokenCount(stats.daily.tokens)} today`;
-    platformText.title = `Remembered locally: ${formatTokenCount(stats.daily.tokens)} today, ${formatTokenCount(stats.weekly.tokens)} this week. Current prompt: ${formatTokenCount(currentPromptTokens)} tokens.`;
+    platformText.textContent = `${platformLabel(platform)} · Reset in ${resetText} · left ${formatQuotaUnits(messagesLeft)}`;
+    platformText.title = [
+      `${modelSpec.displayName}`,
+      `Session: ${formatPercent(sessionPercent)} (${formatQuotaUnits(quotaStats.session.usedUnits)} units used)`,
+      `Weekly: ${formatPercent(weeklyPercent)} (${formatQuotaUnits(quotaStats.weekly.usedUnits)} units used)`,
+      quotaHint.sessionPct === undefined ? "Source: CTX local estimate" : "Source: detected provider quota text",
+      `Remembered tokens: ${formatTokenCount(costStats.daily.tokens)} today, ${formatTokenCount(costStats.weekly.tokens)} week.`,
+      `Cost basis: ${formatUSD(costStats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)} today.`
+    ].join("\n");
   }
-  if (dailyFill) dailyFill.style.width = formatFillWidth(dailyPercent);
+  if (dailyFill) dailyFill.style.width = formatFillWidth(sessionPercent);
   if (weeklyFill) weeklyFill.style.width = formatFillWidth(weeklyPercent);
   if (dailyValue) {
-    dailyValue.textContent = formatPercent(dailyPercent);
-    dailyValue.title = `${formatTokenCount(stats.daily.tokens)} remembered tokens today. Cost basis: ${formatUSD(stats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)}.`;
+    dailyValue.textContent = formatPercent(sessionPercent);
+    dailyValue.title = `Session resets in ${resetText}. Estimated messages left: ${formatQuotaUnits(messagesLeft)}.`;
   }
   if (weeklyValue) {
     weeklyValue.textContent = formatPercent(weeklyPercent);
-    weeklyValue.title = `${formatTokenCount(stats.weekly.tokens)} remembered tokens this week. Cost basis: ${formatUSD(stats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}.`;
+    weeklyValue.title = `Weekly reset in ${formatDuration(Math.max(0, quotaStats.weekly.resetAt - Date.now()))}. Cost basis: ${formatUSD(costStats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}.`;
   }
 }
 
@@ -1628,6 +1692,7 @@ async function recordPromptUsage(source: "local" | "snapshot" = "local") {
   if (inputTokens <= 0) return;
   const modelSpec = detectActiveModel(platform);
   const estimate = estimateCallFromInput(modelSpec.id, inputTokens);
+  const quotaUnits = estimateQuotaUnits(platform, modelSpec, estimate.inputTokens, estimate.outputTokens);
 
   const signature = `${platform}:${modelSpec.id}:${hashText(text)}:${inputTokens}`;
   const now = Date.now();
@@ -1644,6 +1709,7 @@ async function recordPromptUsage(source: "local" | "snapshot" = "local") {
     outputTokens: estimate.outputTokens,
     thinkingTokens: 0,
     costUSD: estimate.costUSD,
+    quotaUnits,
     estimated: true,
     timestamp: now,
     tags: ["web-chat", "estimated"]
@@ -1698,6 +1764,89 @@ function aggregateCostUsage(entries: CostUsageEntry[], platform: Platform) {
   stats.daily.costUSD = roundUSD(stats.daily.costUSD);
   stats.weekly.costUSD = roundUSD(stats.weekly.costUSD);
   return stats;
+}
+
+function aggregateQuotaUsage(entries: CostUsageEntry[], platform: Platform, modelSpec: ModelSpec) {
+  const profile = quotaProfiles[platform] ?? quotaProfiles.generic;
+  const now = Date.now();
+  const sessionEntries = entries.filter((entry) => entry.platform === platform && now - entry.timestamp <= profile.sessionWindowMs);
+  const weeklyEntries = entries.filter((entry) => entry.platform === platform && now - entry.timestamp <= profile.weeklyWindowMs);
+  const sessionStart = sessionEntries.length ? Math.min(...sessionEntries.map((entry) => entry.timestamp)) : now;
+  const weeklyStart = weeklyEntries.length ? Math.min(...weeklyEntries.map((entry) => entry.timestamp)) : now;
+  const sessionUsedUnits = sumQuotaUnits(sessionEntries, platform, modelSpec);
+  const weeklyUsedUnits = sumQuotaUnits(weeklyEntries, platform, modelSpec);
+
+  return {
+    session: {
+      usedUnits: sessionUsedUnits,
+      limitUnits: profile.sessionLimitUnits,
+      resetAt: sessionStart + profile.sessionWindowMs
+    },
+    weekly: {
+      usedUnits: weeklyUsedUnits,
+      limitUnits: profile.weeklyLimitUnits,
+      resetAt: weeklyStart + profile.weeklyWindowMs
+    }
+  };
+}
+
+function sumQuotaUnits(entries: CostUsageEntry[], platform: Platform, fallbackModel: ModelSpec) {
+  return roundQuota(
+    entries.reduce((total, entry) => {
+      if (typeof entry.quotaUnits === "number" && entry.quotaUnits > 0) return total + entry.quotaUnits;
+      const modelSpec = MODEL_REGISTRY[entry.modelId] ?? fallbackModel;
+      return total + estimateQuotaUnits(platform, modelSpec, entry.inputTokens, entry.outputTokens + entry.thinkingTokens);
+    }, 0)
+  );
+}
+
+function estimateQuotaUnits(platform: Platform, modelSpec: ModelSpec, inputTokens: number, outputTokens: number) {
+  const totalTokens = Math.max(0, inputTokens + outputTokens);
+  const platformMultiplier = platform === "claude" ? 1.15 : platform === "chatgpt" ? 1 : 0.85;
+  const tierMultiplier = modelSpec.tier === "reasoning" ? 1.6 : modelSpec.tier === "lite" ? 0.6 : 1;
+  const contextUnits = Math.max(0, totalTokens - 1200) / 4200;
+  return roundQuota(Math.max(0.25, (1 + contextUnits) * platformMultiplier * tierMultiplier));
+}
+
+function readProviderQuotaHint(): QuotaHint {
+  const rawText = document.body?.innerText || "";
+  const text = rawText.length > 16000 ? `${rawText.slice(0, 8000)}\n${rawText.slice(-8000)}` : rawText;
+  const sessionPct = readPercentHint(text, /Session\s*(?:\([^)]+\))?\s*:\s*(\d+(?:\.\d+)?)\s*%/i);
+  const weeklyPct = readPercentHint(text, /Weekly\s*:\s*(\d+(?:\.\d+)?)\s*%/i);
+  const resetText =
+    text.match(/(?:Reset(?:\s+in)?|resets?\s+in)\s*:\s*([0-9dhrm\s]+)(?:\b|$)/i)?.[1]?.trim() ??
+    text.match(/Session\s*(?:\([^)]+\))?\s*:\s*\d+(?:\.\d+)?\s*%\s*(?:[^\d\n]{0,12})\s*([0-9]+d\s*[0-9]+h|[0-9]+h\s*[0-9]+m|[0-9]+m)/i)?.[1]?.trim();
+  const messagesLeftRaw = text.match(/Messages?\s+left\s*:\s*(\d+(?:\.\d+)?)/i)?.[1];
+  const messagesLeft = messagesLeftRaw ? Number(messagesLeftRaw) : undefined;
+  return { sessionPct, weeklyPct, resetText, messagesLeft };
+}
+
+function readPercentHint(text: string, pattern: RegExp) {
+  const value = text.match(pattern)?.[1];
+  if (!value) return undefined;
+  return clampNumber(Number(value), 0, 100);
+}
+
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) return "now";
+  const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function formatQuotaUnits(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value < 10) return value.toFixed(1).replace(/\.0$/, "");
+  return String(Math.floor(value));
+}
+
+function roundQuota(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 async function readTokenBudgetSettings(): Promise<TokenBudgetSettings> {
