@@ -153,6 +153,10 @@ let usageMeterHost: HTMLElement | null = null;
 let usageRefreshTimer: number | null = null;
 let usageUpdateFrame = 0;
 let usageRefreshTicks = 0;
+let usageGlobalTrackingInstalled = false;
+let lastPromptSnapshot = "";
+let lastPromptSnapshotPlatform: Platform | null = null;
+let lastPromptSnapshotAt = 0;
 let lastTokenRecordSignature = "";
 let lastTokenRecordAt = 0;
 const usageTrackedElements = new WeakSet<HTMLElement>();
@@ -1258,6 +1262,7 @@ function startUsageMeter(slot: ToolbarSlot) {
   usageMeterAnchor = anchor;
   usageRefreshTicks = 0;
   ensureUsageMeterHost();
+  installUsageGlobalTracking();
   attachUsageTracking(anchor);
   scheduleUsageMeterUpdate();
   startUsageRefreshLoop();
@@ -1384,16 +1389,16 @@ function ensureUsageMeterHost() {
       }
     </style>
     <section class="meter">
-      <span class="platform">CTX Cost</span>
+      <span class="platform">CTX Usage</span>
       <span class="quota daily">
         <span class="label">Today</span>
         <span class="track"><span class="fill"></span></span>
-        <span class="value">$0.00 / $5.00</span>
+        <span class="value">0%</span>
       </span>
       <span class="quota weekly">
         <span class="label">Week</span>
         <span class="track"><span class="fill"></span></span>
-        <span class="value">$0.00 / $25.00</span>
+        <span class="value">0%</span>
       </span>
     </section>
   `;
@@ -1433,7 +1438,8 @@ async function updateUsageMeter() {
   const budgets = await readTokenBudgetSettings();
   const budget = budgets[modelSpec.platform];
   const stats = aggregateCostUsage(await readCostUsageLog(), platform);
-  const currentPromptTokens = estimateTokens(readPromptText(findPrompt(platform)));
+  const currentPromptText = readPromptText(findPrompt(platform));
+  const currentPromptTokens = estimateTokens(currentPromptText);
   const currentEstimate = estimateCallFromInput(modelSpec.id, currentPromptTokens);
   const dailyPercent = percentUsed(stats.daily.costUSD + currentEstimate.costUSD, budget.dailyUSD);
   const weeklyPercent = percentUsed(stats.weekly.costUSD + currentEstimate.costUSD, budget.weeklyUSD);
@@ -1448,12 +1454,19 @@ async function updateUsageMeter() {
   const weeklyValue = host.querySelector<HTMLElement>(".weekly .value");
 
   if (platformText) {
-    platformText.textContent = `${platformLabel(platform)} · ${modelSpec.displayName} · now ${formatUSD(currentEstimate.costUSD)} est`;
+    platformText.textContent = `${platformLabel(platform)} · ${modelSpec.displayName} · ${formatTokenCount(stats.daily.tokens)} today`;
+    platformText.title = `Remembered locally: ${formatTokenCount(stats.daily.tokens)} today, ${formatTokenCount(stats.weekly.tokens)} this week. Current prompt: ${formatTokenCount(currentPromptTokens)} tokens.`;
   }
-  if (dailyFill) dailyFill.style.width = `${Math.round(dailyPercent)}%`;
-  if (weeklyFill) weeklyFill.style.width = `${Math.round(weeklyPercent)}%`;
-  if (dailyValue) dailyValue.textContent = `${formatUSD(stats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)}`;
-  if (weeklyValue) weeklyValue.textContent = `${formatUSD(stats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}`;
+  if (dailyFill) dailyFill.style.width = formatFillWidth(dailyPercent);
+  if (weeklyFill) weeklyFill.style.width = formatFillWidth(weeklyPercent);
+  if (dailyValue) {
+    dailyValue.textContent = formatPercent(dailyPercent);
+    dailyValue.title = `${formatTokenCount(stats.daily.tokens)} remembered tokens today. Cost basis: ${formatUSD(stats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)}.`;
+  }
+  if (weeklyValue) {
+    weeklyValue.textContent = formatPercent(weeklyPercent);
+    weeklyValue.title = `${formatTokenCount(stats.weekly.tokens)} remembered tokens this week. Cost basis: ${formatUSD(stats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}.`;
+  }
 }
 
 function positionUsageMeterHost(host: HTMLElement, anchor: HTMLElement) {
@@ -1486,10 +1499,17 @@ function attachUsageTracking(anchor: HTMLElement | null) {
   const prompt = findPrompt(platform);
   if (prompt && !usageTrackedElements.has(prompt)) {
     usageTrackedElements.add(prompt);
-    prompt.addEventListener("input", scheduleUsageMeterUpdate, { passive: true });
+    prompt.addEventListener("input", () => {
+      refreshPromptSnapshot(platform);
+      scheduleUsageMeterUpdate();
+    }, { passive: true });
+    prompt.addEventListener("beforeinput", () => {
+      window.setTimeout(() => refreshPromptSnapshot(platform), 0);
+    }, { passive: true });
     prompt.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
-        void recordPromptUsage();
+        refreshPromptSnapshot(platform);
+        void recordPromptUsage("local");
       }
     }, true);
   }
@@ -1501,18 +1521,63 @@ function attachUsageTracking(anchor: HTMLElement | null) {
     if (usageTrackedElements.has(control) || isInsideCtxLauncher(control)) continue;
     usageTrackedElements.add(control);
     control.addEventListener("pointerdown", () => {
-      if (isLikelySendControl(control, composer)) void recordPromptUsage();
+      if (isLikelySendControl(control, composer)) {
+        refreshPromptSnapshot(platform);
+        void recordPromptUsage("snapshot");
+      }
     }, true);
     control.addEventListener("click", () => {
-      if (isLikelySendControl(control, composer)) void recordPromptUsage();
+      if (isLikelySendControl(control, composer)) {
+        refreshPromptSnapshot(platform);
+        void recordPromptUsage("snapshot");
+      }
     }, true);
   }
 
   const form = composer.closest("form");
   if (form && !usageTrackedElements.has(form)) {
     usageTrackedElements.add(form);
-    form.addEventListener("submit", () => void recordPromptUsage(), true);
+    form.addEventListener("submit", () => {
+      refreshPromptSnapshot(platform);
+      void recordPromptUsage("snapshot");
+    }, true);
   }
+}
+
+function installUsageGlobalTracking() {
+  if (usageGlobalTrackingInstalled) return;
+  usageGlobalTrackingInstalled = true;
+
+  document.addEventListener("input", (event) => {
+    if (event.target instanceof HTMLElement && isPromptRelatedTarget(event.target)) {
+      refreshPromptSnapshot();
+      scheduleUsageMeterUpdate();
+    }
+  }, true);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.target instanceof HTMLElement && isPromptRelatedTarget(event.target)) {
+      refreshPromptSnapshot();
+      void recordPromptUsage("snapshot");
+    }
+  }, true);
+
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("button,[role='button']") : null;
+    if (target && isGlobalSendControl(target)) {
+      refreshPromptSnapshot();
+      void recordPromptUsage("snapshot");
+    }
+  }, true);
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("button,[role='button']") : null;
+    if (target && isGlobalSendControl(target)) {
+      refreshPromptSnapshot();
+      void recordPromptUsage("snapshot");
+    }
+  }, true);
 }
 
 function isLikelySendControl(control: HTMLElement, composer: HTMLElement) {
@@ -1526,10 +1591,39 @@ function isLikelySendControl(control: HTMLElement, composer: HTMLElement) {
   return controlRect.width <= 54 && controlRect.height <= 54 && controlRect.right >= composerRect.right - 76;
 }
 
-async function recordPromptUsage() {
+function isPromptRelatedTarget(target: HTMLElement) {
   const platform = detectPlatform();
   const prompt = findPrompt(platform);
-  const text = readPromptText(prompt);
+  return Boolean(prompt && (target === prompt || prompt.contains(target) || target.contains(prompt)));
+}
+
+function isGlobalSendControl(control: HTMLElement) {
+  if (isInsideCtxLauncher(control)) return false;
+  const prompt = findPrompt(detectPlatform());
+  const composer = prompt ? findComposerElement(prompt) : usageMeterAnchor;
+  if (!composer || !composer.contains(control)) return false;
+  return isLikelySendControl(control, composer);
+}
+
+function refreshPromptSnapshot(platform = detectPlatform()) {
+  const text = readPromptText(findPrompt(platform));
+  if (!text) return "";
+  lastPromptSnapshot = text;
+  lastPromptSnapshotPlatform = platform;
+  lastPromptSnapshotAt = Date.now();
+  return text;
+}
+
+function getRecordablePromptText(platform: Platform, source: "local" | "snapshot") {
+  const current = readPromptText(findPrompt(platform));
+  if (current) return current;
+  const snapshotIsFresh = lastPromptSnapshotPlatform === platform && Date.now() - lastPromptSnapshotAt < 30000;
+  return source === "snapshot" && snapshotIsFresh ? lastPromptSnapshot : "";
+}
+
+async function recordPromptUsage(source: "local" | "snapshot" = "local") {
+  const platform = detectPlatform();
+  const text = getRecordablePromptText(platform, source);
   const inputTokens = estimateTokens(text);
   if (inputTokens <= 0) return;
   const modelSpec = detectActiveModel(platform);
@@ -1584,18 +1678,21 @@ function isCostUsageEntry(value: unknown): value is CostUsageEntry {
 function aggregateCostUsage(entries: CostUsageEntry[], platform: Platform) {
   const { todayStart, weekStart } = getTimeWindow();
   const stats = {
-    daily: { costUSD: 0, calls: 0 },
-    weekly: { costUSD: 0, calls: 0 }
+    daily: { costUSD: 0, calls: 0, tokens: 0 },
+    weekly: { costUSD: 0, calls: 0, tokens: 0 }
   };
   for (const entry of entries) {
     if (entry.platform !== platform) continue;
+    const totalTokens = entry.inputTokens + entry.outputTokens + entry.thinkingTokens;
     if (entry.timestamp >= todayStart) {
       stats.daily.costUSD += entry.costUSD;
       stats.daily.calls += 1;
+      stats.daily.tokens += totalTokens;
     }
     if (entry.timestamp >= weekStart) {
       stats.weekly.costUSD += entry.costUSD;
       stats.weekly.calls += 1;
+      stats.weekly.tokens += totalTokens;
     }
   }
   stats.daily.costUSD = roundUSD(stats.daily.costUSD);
@@ -1736,10 +1833,32 @@ function percentUsed(used: number, limit: number) {
   return clampNumber(limit > 0 ? (used / limit) * 100 : 0, 0, 100);
 }
 
+function formatPercent(value: number) {
+  if (value > 0 && value < 0.1) return "<0.1%";
+  if (value >= 100) return "100%";
+  if (value >= 10) return `${Math.round(value)}%`;
+  return `${value.toFixed(1).replace(".0", "")}%`;
+}
+
+function formatFillWidth(value: number) {
+  if (value <= 0) return "0%";
+  return `${Math.max(1.5, Math.min(100, value))}%`;
+}
+
+function formatTokenCount(value: number) {
+  if (value >= 1000000) return `${trimNumber(value / 1000000)}m tokens`;
+  if (value >= 1000) return `${trimNumber(value / 1000)}k tokens`;
+  return `${Math.max(0, Math.round(value))} tokens`;
+}
+
 function formatUSD(value: number) {
   if (value < 0.01) return `$${value.toFixed(4)}`;
   if (value < 100) return `$${value.toFixed(2)}`;
   return `$${Math.round(value).toLocaleString()}`;
+}
+
+function trimNumber(value: number) {
+  return value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
 }
 
 function roundUSD(value: number) {
@@ -2070,6 +2189,7 @@ function insertTextIntoPrompt(target: HTMLElement, text: string) {
     target.value = `${target.value.slice(0, start)}${text}${target.value.slice(end)}`;
     target.dispatchEvent(new Event("input", { bubbles: true }));
     target.focus();
+    refreshPromptSnapshot();
     scheduleUsageMeterUpdate();
     return true;
   }
@@ -2078,6 +2198,7 @@ function insertTextIntoPrompt(target: HTMLElement, text: string) {
     target.focus();
     document.execCommand("insertText", false, text);
     target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    refreshPromptSnapshot();
     scheduleUsageMeterUpdate();
     return true;
   }
