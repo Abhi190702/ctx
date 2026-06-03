@@ -4,7 +4,7 @@ The CTX extension injects a small CTX button near supported AI prompt boxes. Cli
 
 ## Usage Meter
 
-The extension also renders a stable session and weekly usage bar near supported prompt boxes. When the provider page exposes quota text such as `Session (5h): 77%`, `Weekly: 3%`, `Reset in`, or `Messages left`, CTX mirrors that visible quota signal. When the page does not expose private quota counters, CTX falls back to an append-only local ledger and estimates quota movement from the prompt size, active model, and platform profile.
+The extension also renders a compact session and weekly usage bar inside supported prompt boxes. When the provider page exposes quota text such as `Session (5h): 77%`, `Weekly: 3%`, `Reset in`, or `Messages left`, CTX mirrors that visible quota signal. When the page does not expose private quota counters, CTX falls back to an append-only local ledger and estimates quota movement from the prompt size, active model, platform profile, and live response text that appears after the current chat baseline.
 
 The visible meter is intentionally percentage-first, not USD-first. CTX still keeps an internal model pricing registry for OpenAI, Google Gemini, and Anthropic models so future API integrations can calculate exact costs from response metadata such as OpenAI `usage`, Gemini `usageMetadata`, or Anthropic `usage`.
 

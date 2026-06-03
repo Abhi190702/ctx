@@ -201,12 +201,18 @@ let usageRefreshTimer: number | null = null;
 let usageUpdateFrame = 0;
 let usageRefreshTicks = 0;
 let usageGlobalTrackingInstalled = false;
+let usageLiveObserver: MutationObserver | null = null;
+let usageLiveScanTimer: number | null = null;
 let lastPromptSnapshot = "";
 let lastPromptSnapshotPlatform: Platform | null = null;
 let lastPromptSnapshotAt = 0;
 let lastTokenRecordSignature = "";
 let lastTokenRecordAt = 0;
+let lastSendIntentAt = 0;
+let lastLiveBaselineUrl = "";
 const usageTrackedElements = new WeakSet<HTMLElement>();
+const liveUsageBaseline = new WeakSet<HTMLElement>();
+const liveUsageCountedTokens = new WeakMap<HTMLElement, number>();
 let menuOpen = false;
 const ctxWindow = window as Window & {
   __CTX_CONTENT_READY__?: boolean;
@@ -394,6 +400,45 @@ const promptSelectors: Record<Platform, string[]> = {
   bolt: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
   notebooklm: ["textarea", "[contenteditable='true']", "div[role='textbox']"],
   generic: ["textarea", "[contenteditable='true']", "div[role='textbox']"]
+};
+
+const liveMessageSelectors: Record<Platform, string[]> = {
+  chatgpt: ["[data-message-author-role]"],
+  claude: [
+    "[data-testid*='message']",
+    "[data-testid*='conversation-turn']",
+    "[class*='font-claude-message']",
+    "article"
+  ],
+  gemini: [
+    "message-content",
+    "model-response",
+    "user-query",
+    "[class*='model-response']",
+    "[class*='conversation-turn']"
+  ],
+  deepseek: [
+    "[class*='ds-markdown']",
+    "[class*='message']",
+    "[class*='chat'] article",
+    "article"
+  ],
+  copilot: ["[data-content='ai-message']", "[class*='message']", "article"],
+  perplexity: ["[class*='answer']", "[class*='message']", "article"],
+  github: ["[data-testid*='comment']", ".comment-body", "article"],
+  cursor: ["[class*='message']", "article"],
+  grok: ["[class*='message']", "article"],
+  poe: ["[class*='Message']", "[class*='message']", "article"],
+  mistral: ["[class*='message']", "article"],
+  meta: ["[class*='message']", "article"],
+  qwen: ["[class*='message']", "article"],
+  lovable: ["[class*='message']", "article"],
+  replit: ["[class*='message']", "article"],
+  emergent: ["[class*='message']", "article"],
+  v0: ["[class*='message']", "article"],
+  bolt: ["[class*='message']", "article"],
+  notebooklm: ["[class*='message']", "article"],
+  generic: ["[data-message-author-role]", "[data-testid*='message']", "[class*='message']", "article"]
 };
 
 registerMessageListener();
@@ -1310,6 +1355,8 @@ function startUsageMeter(slot: ToolbarSlot) {
   usageRefreshTicks = 0;
   ensureUsageMeterHost();
   installUsageGlobalTracking();
+  installLiveUsageTracking();
+  baselineLiveUsage();
   attachUsageTracking(anchor);
   scheduleUsageMeterUpdate();
   startUsageRefreshLoop();
@@ -1324,7 +1371,14 @@ function stopUsageMeter() {
     window.clearInterval(usageRefreshTimer);
     usageRefreshTimer = null;
   }
+  usageLiveObserver?.disconnect();
+  usageLiveObserver = null;
+  if (usageLiveScanTimer) {
+    window.clearTimeout(usageLiveScanTimer);
+    usageLiveScanTimer = null;
+  }
   usageRefreshTicks = 0;
+  lastLiveBaselineUrl = "";
   usageMeterAnchor = null;
   usageMeterHost?.remove();
   usageMeterHost = null;
@@ -1344,6 +1398,7 @@ function ensureUsageMeterHost() {
     usageMeterHost = existing;
     return existing;
   }
+  if (usageMeterHost && !usageMeterHost.isConnected) return usageMeterHost;
 
   const host = document.createElement("div");
   host.id = CTX_USAGE_METER_ID;
@@ -1351,39 +1406,40 @@ function ensureUsageMeterHost() {
   host.innerHTML = `
     <style>
       #${CTX_USAGE_METER_ID} {
-        position: fixed !important;
-        left: 0;
-        top: 0;
-        z-index: 2147483646 !important;
-        width: min(760px, calc(100vw - 24px));
+        position: absolute !important;
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 3px !important;
+        z-index: 7 !important;
+        width: auto !important;
         pointer-events: none !important;
         box-sizing: border-box !important;
         color-scheme: dark;
         contain: layout style paint;
-        opacity: .96;
+        opacity: .94;
       }
       #${CTX_USAGE_METER_ID} .meter {
         display: grid;
-        grid-template-columns: minmax(86px, .7fr) minmax(118px, 1fr) minmax(118px, 1fr);
+        grid-template-columns: minmax(92px, .62fr) minmax(104px, 1fr) minmax(92px, .88fr);
         align-items: center;
-        gap: 8px;
+        gap: 7px;
         width: 100%;
-        min-height: 26px;
-        padding: 5px 8px;
-        border: 1px solid rgba(139,245,207,.20);
+        min-height: 18px;
+        padding: 2px 8px;
+        border: 1px solid rgba(139,245,207,.15);
         border-radius: 999px;
-        background: rgba(5,8,18,.78);
-        box-shadow: 0 10px 34px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.035);
-        backdrop-filter: blur(14px);
+        background: rgba(4,7,16,.48);
+        box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.025);
+        backdrop-filter: blur(12px);
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
       }
       #${CTX_USAGE_METER_ID} .platform {
         min-width: 0;
         overflow: hidden;
         color: #d1fae5;
-        font-size: 10px;
+        font-size: 9px;
         font-weight: 900;
-        letter-spacing: .02em;
+        letter-spacing: 0;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -1397,7 +1453,7 @@ function ensureUsageMeterHost() {
       #${CTX_USAGE_METER_ID} .label,
       #${CTX_USAGE_METER_ID} .value {
         color: #a7f3d0;
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 850;
         line-height: 1;
         white-space: nowrap;
@@ -1407,7 +1463,7 @@ function ensureUsageMeterHost() {
         text-align: right;
       }
       #${CTX_USAGE_METER_ID} .track {
-        height: 5px;
+        height: 4px;
         overflow: hidden;
         border-radius: 999px;
         background: rgba(148,163,184,.20);
@@ -1428,10 +1484,10 @@ function ensureUsageMeterHost() {
       @media (max-width: 560px) {
         #${CTX_USAGE_METER_ID} .meter {
           grid-template-columns: 1fr 1fr;
-          border-radius: 14px;
+          border-radius: 999px;
         }
         #${CTX_USAGE_METER_ID} .platform {
-          grid-column: 1 / -1;
+          display: none;
         }
       }
     </style>
@@ -1449,7 +1505,6 @@ function ensureUsageMeterHost() {
       </span>
     </section>
   `;
-  document.documentElement.append(host);
   usageMeterHost = host;
   return host;
 }
@@ -1478,7 +1533,7 @@ function scheduleUsageMeterUpdate() {
 async function updateUsageMeter() {
   if (!usageMeterAnchor?.isConnected) return;
   const host = ensureUsageMeterHost();
-  positionUsageMeterHost(host, usageMeterAnchor);
+  embedUsageMeterHost(host, usageMeterAnchor);
 
   const platform = detectPlatform();
   const modelSpec = detectActiveModel(platform);
@@ -1533,29 +1588,29 @@ async function updateUsageMeter() {
   }
 }
 
-function positionUsageMeterHost(host: HTMLElement, anchor: HTMLElement) {
-  const anchorRect = anchor.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const width = Math.round(clampNumber(anchorRect.width - 12, 280, 860));
-  const height = hostRect.height || 28;
-  const viewportPadding = 6;
-  let left = anchorRect.left + (anchorRect.width - width) / 2;
-  let top = anchorRect.bottom + 6;
+function embedUsageMeterHost(host: HTMLElement, anchor: HTMLElement) {
+  const container = getUsageMeterContainer(anchor);
+  if (!container || isInsideCtxLauncher(container)) return;
 
-  if (top + height > window.innerHeight - viewportPadding) top = anchorRect.top - height - 6;
-  left = clampNumber(left, viewportPadding, Math.max(viewportPadding, window.innerWidth - width - viewportPadding));
-  top = clampNumber(top, viewportPadding, Math.max(viewportPadding, window.innerHeight - height - viewportPadding));
-
-  host.style.width = `${width}px`;
-  host.style.left = `${Math.round(left)}px`;
-  host.style.top = `${Math.round(top)}px`;
+  if (host.parentElement !== container) container.append(host);
+  const style = window.getComputedStyle(container);
+  if (style.position === "static") container.style.position = "relative";
+  container.dataset.ctxUsageContainer = "true";
+  host.dataset.platform = detectPlatform();
 }
 
 function repositionUsageMeter() {
   if (!usageMeterHost || !usageMeterAnchor?.isConnected) return;
   window.requestAnimationFrame(() => {
-    if (usageMeterHost && usageMeterAnchor?.isConnected) positionUsageMeterHost(usageMeterHost, usageMeterAnchor);
+    if (usageMeterHost && usageMeterAnchor?.isConnected) embedUsageMeterHost(usageMeterHost, usageMeterAnchor);
   });
+}
+
+function getUsageMeterContainer(anchor: HTMLElement) {
+  if (!isEditableControl(anchor) && !anchor.isContentEditable) return anchor;
+  const composer = findComposerElement(anchor);
+  if (composer && !isEditableControl(composer) && !composer.isContentEditable) return composer;
+  return anchor.parentElement;
 }
 
 function attachUsageTracking(anchor: HTMLElement | null) {
@@ -1564,7 +1619,7 @@ function attachUsageTracking(anchor: HTMLElement | null) {
   if (prompt && !usageTrackedElements.has(prompt)) {
     usageTrackedElements.add(prompt);
     prompt.addEventListener("input", () => {
-      refreshPromptSnapshot(platform);
+      handlePromptInput(platform);
       scheduleUsageMeterUpdate();
     }, { passive: true });
     prompt.addEventListener("beforeinput", () => {
@@ -1572,6 +1627,7 @@ function attachUsageTracking(anchor: HTMLElement | null) {
     }, { passive: true });
     prompt.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        markSendIntent();
         refreshPromptSnapshot(platform);
         void recordPromptUsage("local");
       }
@@ -1586,12 +1642,14 @@ function attachUsageTracking(anchor: HTMLElement | null) {
     usageTrackedElements.add(control);
     control.addEventListener("pointerdown", () => {
       if (isLikelySendControl(control, composer)) {
+        markSendIntent();
         refreshPromptSnapshot(platform);
         void recordPromptUsage("snapshot");
       }
     }, true);
     control.addEventListener("click", () => {
       if (isLikelySendControl(control, composer)) {
+        markSendIntent();
         refreshPromptSnapshot(platform);
         void recordPromptUsage("snapshot");
       }
@@ -1602,6 +1660,7 @@ function attachUsageTracking(anchor: HTMLElement | null) {
   if (form && !usageTrackedElements.has(form)) {
     usageTrackedElements.add(form);
     form.addEventListener("submit", () => {
+      markSendIntent();
       refreshPromptSnapshot(platform);
       void recordPromptUsage("snapshot");
     }, true);
@@ -1614,7 +1673,7 @@ function installUsageGlobalTracking() {
 
   document.addEventListener("input", (event) => {
     if (event.target instanceof HTMLElement && isPromptRelatedTarget(event.target)) {
-      refreshPromptSnapshot();
+      handlePromptInput();
       scheduleUsageMeterUpdate();
     }
   }, true);
@@ -1622,6 +1681,7 @@ function installUsageGlobalTracking() {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.target instanceof HTMLElement && isPromptRelatedTarget(event.target)) {
+      markSendIntent();
       refreshPromptSnapshot();
       void recordPromptUsage("snapshot");
     }
@@ -1630,6 +1690,7 @@ function installUsageGlobalTracking() {
   document.addEventListener("pointerdown", (event) => {
     const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("button,[role='button']") : null;
     if (target && isGlobalSendControl(target)) {
+      markSendIntent();
       refreshPromptSnapshot();
       void recordPromptUsage("snapshot");
     }
@@ -1638,10 +1699,134 @@ function installUsageGlobalTracking() {
   document.addEventListener("click", (event) => {
     const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("button,[role='button']") : null;
     if (target && isGlobalSendControl(target)) {
+      markSendIntent();
       refreshPromptSnapshot();
       void recordPromptUsage("snapshot");
     }
   }, true);
+}
+
+function markSendIntent() {
+  lastSendIntentAt = Date.now();
+}
+
+function handlePromptInput(platform = detectPlatform()) {
+  const text = readPromptText(findPrompt(platform));
+  if (text) {
+    lastPromptSnapshot = text;
+    lastPromptSnapshotPlatform = platform;
+    lastPromptSnapshotAt = Date.now();
+    return;
+  }
+
+  const snapshotIsFresh = lastPromptSnapshotPlatform === platform && Date.now() - lastPromptSnapshotAt < 10000;
+  const clearLooksLikeSend = snapshotIsFresh && Date.now() - lastSendIntentAt < 2500;
+  if (clearLooksLikeSend) void recordPromptUsage("snapshot");
+}
+
+function installLiveUsageTracking() {
+  if (usageLiveObserver || !document.body) return;
+  usageLiveObserver = new MutationObserver(() => scheduleLiveUsageScan());
+  usageLiveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function baselineLiveUsage(force = false) {
+  if (!force && lastLiveBaselineUrl === location.href) return;
+  lastLiveBaselineUrl = location.href;
+  for (const element of getLiveMessageElements(detectPlatform())) {
+    liveUsageBaseline.add(element);
+  }
+}
+
+function scheduleLiveUsageScan() {
+  if (usageLiveScanTimer) return;
+  usageLiveScanTimer = window.setTimeout(() => {
+    usageLiveScanTimer = null;
+    void scanLiveUsageDeltas();
+  }, 180);
+}
+
+async function scanLiveUsageDeltas() {
+  if (!usageMeterAnchor?.isConnected) return;
+  if (lastLiveBaselineUrl !== location.href) baselineLiveUsage();
+
+  const platform = detectPlatform();
+  const elements = getLiveMessageElements(platform);
+  let outputTokens = 0;
+
+  for (const element of elements) {
+    if (liveUsageBaseline.has(element)) continue;
+    if (!isUsageMessageCandidate(element)) continue;
+
+    const text = getLiveMessageText(element);
+    const normalized = normalizePromptText(text);
+    if (!normalized || normalized.length < 12) continue;
+    if (lastPromptSnapshot && normalized === normalizePromptText(lastPromptSnapshot)) continue;
+    if (detectUsageMessageRole(element) === "user") continue;
+
+    const tokens = estimateTokens(normalized);
+    const previousTokens = liveUsageCountedTokens.get(element) ?? 0;
+    const delta = tokens - previousTokens;
+    if (delta <= 0) continue;
+
+    liveUsageCountedTokens.set(element, tokens);
+    outputTokens += delta;
+  }
+
+  if (outputTokens > 0) await recordUsageDelta(platform, 0, outputTokens, "dom-response");
+}
+
+function getLiveMessageElements(platform: Platform) {
+  const selectors = [...(liveMessageSelectors[platform] ?? []), ...liveMessageSelectors.generic];
+  const seen = new Set<HTMLElement>();
+  const candidates: HTMLElement[] = [];
+
+  for (const selector of selectors) {
+    for (const element of queryVisibleElements(selector)) {
+      if (seen.has(element)) continue;
+      seen.add(element);
+      candidates.push(element);
+    }
+  }
+
+  return candidates.filter((element) => !candidates.some((other) => other !== element && element.contains(other)));
+}
+
+function isUsageMessageCandidate(element: HTMLElement) {
+  if (isInsideCtxLauncher(element)) return false;
+  if (element.closest(`#${CTX_USAGE_METER_ID}, #${CTX_WELCOME_ID}`)) return false;
+  const prompt = findPrompt(detectPlatform());
+  const composer = prompt ? findComposerElement(prompt) : null;
+  if (composer && (composer.contains(element) || element.contains(composer))) return false;
+
+  const rect = element.getBoundingClientRect();
+  if (!isVisibleRect(rect) || rect.width < 140 || rect.height < 14) return false;
+  const text = getLiveMessageText(element);
+  if (!text || text.length < 12) return false;
+  if (/^(session|weekly|usage|reset in|messages left)\b/i.test(text.trim())) return false;
+  return true;
+}
+
+function getLiveMessageText(element: HTMLElement) {
+  return (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function detectUsageMessageRole(element: HTMLElement) {
+  const roleText = [
+    element.getAttribute("data-message-author-role"),
+    element.getAttribute("data-author"),
+    element.getAttribute("data-role"),
+    element.getAttribute("aria-label"),
+    element.getAttribute("data-testid"),
+    element.className
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (/\b(user|human|you|me)\b/.test(roleText)) return "user";
+  if (/\b(assistant|model|response|answer|bot|ai|claude|gemini|copilot|deepseek)\b/.test(roleText)) return "assistant";
+  return "assistant";
 }
 
 function isLikelySendControl(control: HTMLElement, composer: HTMLElement) {
@@ -1691,8 +1876,8 @@ async function recordPromptUsage(source: "local" | "snapshot" = "local") {
   const inputTokens = estimateTokens(text);
   if (inputTokens <= 0) return;
   const modelSpec = detectActiveModel(platform);
-  const estimate = estimateCallFromInput(modelSpec.id, inputTokens);
-  const quotaUnits = estimateQuotaUnits(platform, modelSpec, estimate.inputTokens, estimate.outputTokens);
+  const costUSD = calculateCost(modelSpec.id, inputTokens, 0, 0);
+  const quotaUnits = estimateQuotaUnits(platform, modelSpec, inputTokens, 0);
 
   const signature = `${platform}:${modelSpec.id}:${hashText(text)}:${inputTokens}`;
   const now = Date.now();
@@ -1705,14 +1890,38 @@ async function recordPromptUsage(source: "local" | "snapshot" = "local") {
     platform,
     billingPlatform: modelSpec.platform,
     modelId: modelSpec.id,
-    inputTokens: estimate.inputTokens,
-    outputTokens: estimate.outputTokens,
+    inputTokens,
+    outputTokens: 0,
     thinkingTokens: 0,
-    costUSD: estimate.costUSD,
+    costUSD,
     quotaUnits,
     estimated: true,
     timestamp: now,
     tags: ["web-chat", "estimated"]
+  });
+}
+
+async function recordUsageDelta(platform: Platform, inputTokens: number, outputTokens: number, source: string) {
+  const totalTokens = inputTokens + outputTokens;
+  if (totalTokens <= 0) return;
+
+  const modelSpec = detectActiveModel(platform);
+  const costUSD = calculateCost(modelSpec.id, inputTokens, outputTokens, 0);
+  const quotaUnits = estimateQuotaUnits(platform, modelSpec, inputTokens, outputTokens);
+
+  await appendCostUsage({
+    id: createUsageId(),
+    platform,
+    billingPlatform: modelSpec.platform,
+    modelId: modelSpec.id,
+    inputTokens,
+    outputTokens,
+    thinkingTokens: 0,
+    costUSD,
+    quotaUnits,
+    estimated: true,
+    timestamp: Date.now(),
+    tags: ["web-chat", source, "estimated"]
   });
 }
 
