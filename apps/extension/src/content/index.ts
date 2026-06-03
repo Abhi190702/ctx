@@ -1407,102 +1407,117 @@ function ensureUsageMeterHost() {
     <style>
       #${CTX_USAGE_METER_ID} {
         position: absolute !important;
-        left: 12px !important;
-        right: 12px !important;
-        bottom: 3px !important;
-        z-index: 7 !important;
+        left: 26px !important;
+        right: 30px !important;
+        bottom: 18px !important;
+        z-index: 5 !important;
         width: auto !important;
         pointer-events: none !important;
         box-sizing: border-box !important;
-        color-scheme: dark;
+        color-scheme: normal;
         contain: layout style paint;
-        opacity: .94;
+        opacity: .98;
       }
       #${CTX_USAGE_METER_ID} .meter {
         display: grid;
-        grid-template-columns: minmax(92px, .62fr) minmax(104px, 1fr) minmax(92px, .88fr);
+        grid-template-columns: minmax(220px, 1fr) auto;
         align-items: center;
-        gap: 7px;
+        gap: 20px;
         width: 100%;
-        min-height: 18px;
-        padding: 2px 8px;
-        border: 1px solid rgba(139,245,207,.15);
-        border-radius: 999px;
-        background: rgba(4,7,16,.48);
-        box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.025);
-        backdrop-filter: blur(12px);
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        min-height: 22px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
+        font-family: inherit;
       }
-      #${CTX_USAGE_METER_ID} .platform {
-        min-width: 0;
-        overflow: hidden;
-        color: #d1fae5;
-        font-size: 9px;
-        font-weight: 900;
-        letter-spacing: 0;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      #${CTX_USAGE_METER_ID} .quota {
+      #${CTX_USAGE_METER_ID} .session {
         min-width: 0;
         display: grid;
-        grid-template-columns: auto minmax(34px, 1fr) auto;
+        grid-template-columns: auto minmax(140px, min(31vw, 300px));
         align-items: center;
-        gap: 5px;
+        gap: 8px;
+        justify-self: start;
       }
-      #${CTX_USAGE_METER_ID} .label,
-      #${CTX_USAGE_METER_ID} .value {
-        color: #a7f3d0;
-        font-size: 8px;
-        font-weight: 850;
-        line-height: 1;
+      #${CTX_USAGE_METER_ID} .session-label,
+      #${CTX_USAGE_METER_ID} .meta {
+        color: rgba(255,255,255,.48);
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.1;
         white-space: nowrap;
+        letter-spacing: 0;
       }
-      #${CTX_USAGE_METER_ID} .value {
-        color: #cbd5e1;
-        text-align: right;
+      #${CTX_USAGE_METER_ID} .session-value,
+      #${CTX_USAGE_METER_ID} .reset-value {
+        color: #2f9af7;
+        font-weight: 700;
       }
-      #${CTX_USAGE_METER_ID} .track {
-        height: 4px;
+      #${CTX_USAGE_METER_ID} .left-value {
+        color: #2f9af7;
+        font-weight: 700;
+      }
+      #${CTX_USAGE_METER_ID}[data-left-level="low"] .left-value {
+        color: #ff4b5f;
+      }
+      #${CTX_USAGE_METER_ID} .session-track {
+        width: 100%;
+        height: 6px;
         overflow: hidden;
         border-radius: 999px;
-        background: rgba(148,163,184,.20);
+        background: rgba(0,0,0,.58);
       }
-      #${CTX_USAGE_METER_ID} .fill {
+      #${CTX_USAGE_METER_ID} .session-fill {
         width: 0%;
         height: 100%;
         border-radius: inherit;
-        background: linear-gradient(90deg, #5eead4, #8bf5cf);
-        transition: width 180ms ease, background 180ms ease;
+        background: #2f9af7;
+        transition: width 260ms cubic-bezier(.22,1,.36,1), background 180ms ease;
       }
-      #${CTX_USAGE_METER_ID}[data-level="watch"] .fill {
-        background: linear-gradient(90deg, #facc15, #fb923c);
+      #${CTX_USAGE_METER_ID} .meta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 22px;
+        min-width: 0;
+        text-align: right;
       }
-      #${CTX_USAGE_METER_ID}[data-level="danger"] .fill {
-        background: linear-gradient(90deg, #fb7185, #f97316);
+      #${CTX_USAGE_METER_ID}[data-level="watch"] .session-fill {
+        background: #f59e0b;
       }
-      @media (max-width: 560px) {
+      #${CTX_USAGE_METER_ID}[data-level="danger"] .session-fill {
+        background: #ff4b5f;
+      }
+      #${CTX_USAGE_METER_ID} .weekly {
+        display: none;
+      }
+      @media (max-width: 720px) {
         #${CTX_USAGE_METER_ID} .meter {
-          grid-template-columns: 1fr 1fr;
-          border-radius: 999px;
+          grid-template-columns: 1fr;
+          gap: 5px;
         }
-        #${CTX_USAGE_METER_ID} .platform {
-          display: none;
+        #${CTX_USAGE_METER_ID} .meta {
+          justify-content: flex-start;
+          gap: 12px;
+          font-size: 11px;
+        }
+        #${CTX_USAGE_METER_ID} .session {
+          grid-template-columns: auto 1fr;
         }
       }
     </style>
     <section class="meter">
-      <span class="platform">CTX Usage</span>
-      <span class="quota daily">
-        <span class="label">Today</span>
-        <span class="track"><span class="fill"></span></span>
-        <span class="value">0%</span>
+      <span class="session">
+        <span class="session-label">Session: <strong class="session-value">0%</strong></span>
+        <span class="session-track"><span class="session-fill"></span></span>
       </span>
-      <span class="quota weekly">
-        <span class="label">Week</span>
-        <span class="track"><span class="fill"></span></span>
-        <span class="value">0%</span>
+      <span class="meta">
+        <span>Reset in: <strong class="reset-value">--</strong></span>
+        <span>Messages left: <strong class="left-value">--</strong></span>
       </span>
+      <span class="weekly" hidden></span>
     </section>
   `;
   usageMeterHost = host;
@@ -1555,36 +1570,29 @@ async function updateUsageMeter() {
 
   host.dataset.level = level;
   host.dataset.estimated = quotaHint.sessionPct === undefined ? "true" : "false";
-  const platformText = host.querySelector<HTMLElement>(".platform");
-  const sessionLabel = host.querySelector<HTMLElement>(".daily .label");
-  const weeklyLabel = host.querySelector<HTMLElement>(".weekly .label");
-  const dailyFill = host.querySelector<HTMLElement>(".daily .fill");
-  const weeklyFill = host.querySelector<HTMLElement>(".weekly .fill");
-  const dailyValue = host.querySelector<HTMLElement>(".daily .value");
-  const weeklyValue = host.querySelector<HTMLElement>(".weekly .value");
+  host.dataset.leftLevel = messagesLeft <= 1 ? "low" : "ok";
+  const sessionFill = host.querySelector<HTMLElement>(".session-fill");
+  const sessionValue = host.querySelector<HTMLElement>(".session-value");
+  const resetValue = host.querySelector<HTMLElement>(".reset-value");
+  const leftValue = host.querySelector<HTMLElement>(".left-value");
+  const weeklyValue = host.querySelector<HTMLElement>(".weekly");
+  const detail = [
+    `${platformLabel(platform)} · ${modelSpec.displayName}`,
+    `Session: ${formatPercent(sessionPercent)} (${formatQuotaUnits(quotaStats.session.usedUnits)} units used)`,
+    `Weekly: ${formatPercent(weeklyPercent)} (${formatQuotaUnits(quotaStats.weekly.usedUnits)} units used)`,
+    quotaHint.sessionPct === undefined ? "Source: CTX local estimate" : "Source: detected provider quota text",
+    `Remembered tokens: ${formatTokenCount(costStats.daily.tokens)} today, ${formatTokenCount(costStats.weekly.tokens)} week.`,
+    `Cost basis: ${formatUSD(costStats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)} today.`
+  ].join("\n");
 
-  if (sessionLabel) sessionLabel.textContent = "Session";
-  if (weeklyLabel) weeklyLabel.textContent = "Weekly";
-  if (platformText) {
-    platformText.textContent = `${platformLabel(platform)} · Reset in ${resetText} · left ${formatQuotaUnits(messagesLeft)}`;
-    platformText.title = [
-      `${modelSpec.displayName}`,
-      `Session: ${formatPercent(sessionPercent)} (${formatQuotaUnits(quotaStats.session.usedUnits)} units used)`,
-      `Weekly: ${formatPercent(weeklyPercent)} (${formatQuotaUnits(quotaStats.weekly.usedUnits)} units used)`,
-      quotaHint.sessionPct === undefined ? "Source: CTX local estimate" : "Source: detected provider quota text",
-      `Remembered tokens: ${formatTokenCount(costStats.daily.tokens)} today, ${formatTokenCount(costStats.weekly.tokens)} week.`,
-      `Cost basis: ${formatUSD(costStats.daily.costUSD)} / ${formatUSD(budget.dailyUSD)} today.`
-    ].join("\n");
-  }
-  if (dailyFill) dailyFill.style.width = formatFillWidth(sessionPercent);
-  if (weeklyFill) weeklyFill.style.width = formatFillWidth(weeklyPercent);
-  if (dailyValue) {
-    dailyValue.textContent = formatPercent(sessionPercent);
-    dailyValue.title = `Session resets in ${resetText}. Estimated messages left: ${formatQuotaUnits(messagesLeft)}.`;
-  }
+  host.title = detail;
+  if (sessionFill) sessionFill.style.width = formatFillWidth(sessionPercent);
+  if (sessionValue) sessionValue.textContent = formatPercent(sessionPercent);
+  if (resetValue) resetValue.textContent = resetText;
+  if (leftValue) leftValue.textContent = formatQuotaUnits(messagesLeft);
   if (weeklyValue) {
-    weeklyValue.textContent = formatPercent(weeklyPercent);
-    weeklyValue.title = `Weekly reset in ${formatDuration(Math.max(0, quotaStats.weekly.resetAt - Date.now()))}. Cost basis: ${formatUSD(costStats.weekly.costUSD)} / ${formatUSD(budget.weeklyUSD)}.`;
+    weeklyValue.textContent = `Weekly ${formatPercent(weeklyPercent)}`;
+    weeklyValue.title = detail;
   }
 }
 
@@ -2200,7 +2208,7 @@ function formatPercent(value: number) {
 
 function formatFillWidth(value: number) {
   if (value <= 0) return "0%";
-  return `${Math.max(1.5, Math.min(100, value))}%`;
+  return `${Math.max(3, Math.min(100, value))}%`;
 }
 
 function formatTokenCount(value: number) {
